@@ -1,5 +1,5 @@
 """The Steward plugin SDK for Python: the plumbing between the plugin contract (gRPC, see
-../../proto) and the functions a plugin writes.
+../proto) and the functions a plugin writes.
 
     plugin = create_plugin(name="github", version="0.1.0", inputs=[...], validate=validate)
     plugin.resource(kind="repository", inputs=[...], provision=provision, deprovision=deprovision)

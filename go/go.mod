@@ -1,4 +1,4 @@
-module github.com/treno-dev/steward/sdk/plugin/go
+module github.com/treno-dev/steward-sdk/go
 
 go 1.25.0
 

@@ -1,12 +1,12 @@
 version: v2
 inputs:
-  - directory: ../../proto
+  - directory: ../proto
 clean: true
 managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/treno-dev/steward/sdk/plugin/go/gen
+      value: github.com/treno-dev/steward-sdk/go/gen
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.36.12
     out: gen

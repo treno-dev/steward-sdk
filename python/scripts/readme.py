@@ -4,7 +4,7 @@ relative to the SDK package, and placeholders in a template get sample values.
 
 A block looks like this, and everything between the code fences is replaced:
 
-    <!-- template: ../../templates/python/src/plugin.py.tmpl -->
+    <!-- template: ../templates/python/src/plugin.py.tmpl -->
     ```python
     ```
     <!-- /template -->

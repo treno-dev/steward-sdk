@@ -18,8 +18,8 @@ npm start
 
 `steward plugin init` takes its templates from the SDK release, so the project always matches the
 SDK it depends on. To work on the SDK and its templates together, point it at a local checkout with
-`--sdk-path /path/to/steward/sdk`. The templates live next to the SDKs, in `../../templates/js` and
-`../../templates/ts`.
+`--sdk-path /path/to/steward-sdk`. The templates live next to the SDKs, in `../templates/js` and
+`../templates/ts`.
 
 ## A plugin
 
@@ -27,7 +27,7 @@ This is the plugin that `steward plugin init --language js` generates, with a re
 provisioned and given access to. The block below is filled in from the template by `npm run readme`,
 so the two never differ.
 
-<!-- template: ../../templates/js/src/plugin.js.tmpl -->
+<!-- template: ../templates/js/src/plugin.js.tmpl -->
 ```js
 // This is the file you edit. It declares what your plugin offers and implements the calls Steward
 // makes. The gRPC plumbing, the handshake and the health check live in @steward/plugin.
@@ -258,12 +258,12 @@ Write logs to stderr. Standard output is reserved for the one handshake line the
 
 ## Developing the SDK
 
-The messages and gRPC services are generated from `../../proto` with `buf`, and the generated code is
+The messages and gRPC services are generated from `../proto` with `buf`, and the generated code is
 not committed.
 
 ```sh
 npm install
 npm run build        # buf generate, then tsc into dist/
-npm run readme       # refill the example above from ../../templates/js
+npm run readme       # refill the example above from ../templates/js
 npm run readme:check # fail if the example is out of date (for CI)
 ```

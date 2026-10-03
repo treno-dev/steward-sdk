@@ -18,10 +18,10 @@ go run .
 
 `steward plugin init` takes its templates from the SDK release, so the project always matches the SDK
 it depends on. To work on the SDK and its templates together, point it at a local checkout with
-`--sdk-path /path/to/steward/sdk`.
+`--sdk-path /path/to/steward-sdk`.
 
 The generated plugin, with a resource that can be provisioned and given access to, is
-[`../../templates/go/main.go.tmpl`](../../templates/go/main.go.tmpl). A plugin needs one
+[`../templates/go/main.go.tmpl`](../templates/go/main.go.tmpl). A plugin needs one
 `steward.New(...)`, any number of `plugin.Resource(...)` and `plugin.Application(...)` declarations,
 and a final `plugin.Serve()`. If it needs more than one tool, for example both Cloudflare and AWS, take
 the credentials for each as inputs.
@@ -145,7 +145,7 @@ Write logs to stderr. Standard output is reserved for the one handshake line the
 
 ## Developing the SDK
 
-The messages and gRPC services in `gen/` are generated from `../../proto` with `buf` (`buf.gen.yaml`,
+The messages and gRPC services in `gen/` are generated from `../proto` with `buf` (`buf.gen.yaml`,
 using buf's remote plugins, so it needs network access). Unlike the other SDKs the generated code **is
 committed**, because Go consumers install the module as it is, with no build step. Regenerate it after
 the contract changes:

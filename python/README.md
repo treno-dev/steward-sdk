@@ -19,7 +19,7 @@ python src/plugin.py
 
 `steward plugin init` takes its templates from the SDK release, so the project always matches the
 SDK it depends on. To work on the SDK and its templates together, point it at a local checkout with
-`--sdk-path /path/to/steward/sdk`. The template lives next to the SDKs, in `../../templates/python`.
+`--sdk-path /path/to/steward-sdk`. The template lives next to the SDKs, in `../templates/python`.
 
 ## A plugin
 
@@ -27,7 +27,7 @@ This is the plugin that `steward plugin init --language python` generates, with 
 provisioned and given access to. The block below is filled in from the template by
 `python scripts/readme.py`, so the two never differ.
 
-<!-- template: ../../templates/python/src/plugin.py.tmpl -->
+<!-- template: ../templates/python/src/plugin.py.tmpl -->
 ```python
 # This is the file you edit. It declares what your plugin offers and implements the calls Steward
 # makes. The gRPC plumbing, the handshake and the health check live in steward_plugin.
@@ -282,7 +282,7 @@ handshake line the runner reads.
 
 ## Developing the SDK
 
-The messages and gRPC services are generated from `../../proto` with `buf` (`buf.gen.yaml`, using
+The messages and gRPC services are generated from `../proto` with `buf` (`buf.gen.yaml`, using
 buf's remote plugins, so it needs network access), and the generated code is not committed. The plugin
 versions in `buf.gen.yaml` decide the minimum `protobuf` and `grpcio` the package requires.
 
@@ -290,7 +290,7 @@ versions in `buf.gen.yaml` decide the minimum `protobuf` and `grpcio` the packag
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 python scripts/generate.py          # the contract into src/steward_plugin/_gen
-python scripts/readme.py            # refill the example above from ../../templates/python
+python scripts/readme.py            # refill the example above from ../templates/python
 python scripts/readme.py --check    # fail if the example is out of date (for CI)
 python -m build                     # the wheel and sdist, with the generated code
 ```

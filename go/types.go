@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/structpb"
 
-	pluginv1 "github.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1"
+	pluginv1 "github.com/treno-dev/steward-sdk/go/gen/steward/plugin/v1"
 )
 
 // Struct turns a map into the Struct the contract uses for open-ended values, such as a response's

@@ -2,7 +2,7 @@ module [[.Name]]
 
 go 1.25
 
-require github.com/treno-dev/steward/sdk/plugin/go [[if .SDKPath]]v0.0.0[[else]]v[[.SDKVersion]][[end]]
+require github.com/treno-dev/steward-sdk/go [[if .SDKPath]]v0.0.0[[else]]v[[.SDKVersion]][[end]]
 [[if .SDKPath]]
-replace github.com/treno-dev/steward/sdk/plugin/go => [[.SDKPath]]
+replace github.com/treno-dev/steward-sdk/go => [[.SDKPath]]
 [[end]]

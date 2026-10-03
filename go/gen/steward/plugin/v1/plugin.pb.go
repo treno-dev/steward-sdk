@@ -3456,8 +3456,8 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x06Delete\x122.steward.plugin.v1.ApplicationServiceDeleteRequest\x1a3.steward.plugin.v1.ApplicationServiceDeleteResponse\x12q\n" +
 	"\x06Deploy\x122.steward.plugin.v1.ApplicationServiceDeployRequest\x1a3.steward.plugin.v1.ApplicationServiceDeployResponse\x12\x83\x01\n" +
 	"\fSetVariables\x128.steward.plugin.v1.ApplicationServiceSetVariablesRequest\x1a9.steward.plugin.v1.ApplicationServiceSetVariablesResponse\x12k\n" +
-	"\x04List\x120.steward.plugin.v1.ApplicationServiceListRequest\x1a1.steward.plugin.v1.ApplicationServiceListResponseB\xd5\x01\n" +
-	"\x15com.steward.plugin.v1B\vPluginProtoP\x01ZIgithub.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1;pluginv1\xa2\x02\x03SPX\xaa\x02\x11Steward.Plugin.V1\xca\x02\x11Steward\\Plugin\\V1\xe2\x02\x1dSteward\\Plugin\\V1\\GPBMetadata\xea\x02\x13Steward::Plugin::V1b\x06proto3"
+	"\x04List\x120.steward.plugin.v1.ApplicationServiceListRequest\x1a1.steward.plugin.v1.ApplicationServiceListResponseB\xce\x01\n" +
+	"\x15com.steward.plugin.v1B\vPluginProtoP\x01ZBgithub.com/treno-dev/steward-sdk/go/gen/steward/plugin/v1;pluginv1\xa2\x02\x03SPX\xaa\x02\x11Steward.Plugin.V1\xca\x02\x11Steward\\Plugin\\V1\xe2\x02\x1dSteward\\Plugin\\V1\\GPBMetadata\xea\x02\x13Steward::Plugin::V1b\x06proto3"
 
 var (
 	file_steward_plugin_v1_plugin_proto_rawDescOnce sync.Once

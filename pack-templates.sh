@@ -1,8 +1,8 @@
 #!/bin/sh
-# Packs every template (sdk/templates/<language>) into the archive that `steward plugin init`
+# Packs every template (templates/<language>) into the archive that `steward plugin init`
 # downloads from an SDK release, with the checksum it verifies:
 #
-#   sdk/pack-templates.sh <version> <out-dir>
+#   ./pack-templates.sh <version> <out-dir>
 #
 # The archive holds a VERSION file and one folder per language under templates/. Attach
 # templates.tar.gz and templates.tar.gz.sha256 to the release.

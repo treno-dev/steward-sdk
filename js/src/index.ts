@@ -1,5 +1,5 @@
 // The Steward plugin SDK for JavaScript: the plumbing between the plugin contract (gRPC, see
-// ../../proto) and the plain objects a plugin works with.
+// ../proto) and the plain objects a plugin works with.
 //
 //   const plugin = createPlugin({ name: 'github', version: '0.1.0', inputs: [...], validate });
 //   plugin.resource({ kind: 'repository', inputs: [...], provision, deprovision, list });

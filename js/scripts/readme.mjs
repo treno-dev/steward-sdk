@@ -4,7 +4,7 @@
 //
 // A block looks like this, and everything between the code fences is replaced:
 //
-//   <!-- template: ../../templates/js/src/plugin.js.tmpl -->
+//   <!-- template: ../templates/js/src/plugin.js.tmpl -->
 //   ```js
 //   ```
 //   <!-- /template -->

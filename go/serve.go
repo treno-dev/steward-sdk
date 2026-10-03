@@ -15,7 +15,7 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 
-	pluginv1 "github.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1"
+	pluginv1 "github.com/treno-dev/steward-sdk/go/gen/steward/plugin/v1"
 )
 
 // The version of the Steward plugin contract this plugin speaks.

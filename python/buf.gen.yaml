@@ -1,6 +1,6 @@
 version: v2
 inputs:
-  - directory: ../../proto
+  - directory: ../proto
 clean: true
 plugins:
   - remote: buf.build/protocolbuffers/python:v36.2

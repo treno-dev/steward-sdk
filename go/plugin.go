@@ -1,5 +1,5 @@
 // Package steward is the Steward plugin SDK for Go: the plumbing between the plugin contract (gRPC,
-// see ../../proto) and the functions a plugin writes.
+// see ../proto) and the functions a plugin writes.
 //
 //	plugin := steward.New(steward.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
 //	plugin.Resource("repository", steward.ResourceOptions{Provision: provision, Deprovision: deprovision})
@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	pluginv1 "github.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1"
+	pluginv1 "github.com/treno-dev/steward-sdk/go/gen/steward/plugin/v1"
 )
 
 // Options declare the plugin and its integration: what is needed to create an integration from it,
