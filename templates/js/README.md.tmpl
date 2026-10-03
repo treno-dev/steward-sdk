@@ -1,0 +1,25 @@
+# [[.Title]]
+
+A Steward plugin for [[.Title]], built with [`@steward/plugin`](https://github.com/treno-dev/steward/tree/main/sdk/plugin/js).
+
+## Run
+
+```sh
+npm install
+npm start
+```
+
+Steward starts the plugin itself and talks to it over gRPC. Running it by hand prints the handshake
+line the runner reads, and nothing else on standard output. Write logs to stderr.
+
+## Where things are
+
+`src/plugin.js` declares the integration (what it needs to connect), each kind of resource and the
+handlers Steward calls: `provision`, `deprovision`, `grantAccess`, `revokeAccess` and `getAccess`.
+Delete the handlers you do not need: Steward offers only what you implement.
+
+To add a kind of resource, call `plugin.resource({ kind, ... })` again with its own inputs, outputs and
+handlers.
+
+See the [SDK README](https://github.com/treno-dev/steward/blob/main/sdk/plugin/js/README.md) for
+everything a plugin can declare.
