@@ -79,9 +79,6 @@ jobs:
 
   go:
     name: Go
-    # On main, the Generate workflow regenerates the committed code and checks it builds. This job is for
-    # pull requests and releases, where stale generated code is an error to fix, not to commit.
-    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -99,7 +96,10 @@ jobs:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
 
+      # On main, the Generate workflow regenerates the committed code when the contract changes. For pull
+      # requests and releases, stale generated code is an error to fix, not to commit.
       - name: The committed generated code is current
+        if: github.ref != 'refs/heads/main'
         run: |
           buf generate
 

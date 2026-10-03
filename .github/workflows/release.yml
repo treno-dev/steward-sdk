@@ -171,3 +171,22 @@ jobs:
 
           git tag "go/$GITHUB_REF_NAME"
           git push origin "go/$GITHUB_REF_NAME"
+
+      # The proxy fetches a version the first time it is asked for it, and pkg.go.dev lists what the proxy
+      # has. Asking now means the version is there when someone runs `go get`. Neither can fail the release:
+      # the version is installable from the tag whether or not they have caught up.
+      - name: Ask the Go module proxy for the new version
+        run: |
+          module=github.com/treno-dev/steward-sdk/go
+
+          for attempt in 1 2 3 4 5 6; do
+            if curl -fsS "https://proxy.golang.org/$module/@v/v$VERSION.info"; then
+              echo
+              curl -fsS -X POST "https://pkg.go.dev/fetch/$module@v$VERSION" > /dev/null || true
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "The proxy has not fetched $module@v$VERSION yet. It will on the first go get." >&2
