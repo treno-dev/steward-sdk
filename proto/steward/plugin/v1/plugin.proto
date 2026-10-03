@@ -4,12 +4,12 @@ package steward.plugin.v1;
 
 import "google/protobuf/struct.proto";
 
-// The plugin contract. Every plugin serves PluginService. A plugin that supports access to its
-// integrations as a whole also serves IntegrationService, and one that has resources serves
-// ResourceService, and one that runs applications serves ApplicationService. Which of those calls
-// apply to which integration or resource kind is declared in Describe through capabilities; a call
-// for a capability that was not declared fails with UNIMPLEMENTED. Within v1 the contract is
-// additive only.
+// The plugin contract. A plugin is one integration, like a provider, and every plugin serves
+// PluginService. A plugin whose integration supports access as a whole also serves
+// IntegrationService, one that has resources serves ResourceService, and one that runs
+// applications serves ApplicationService. Which of those calls apply to the integration or to a
+// resource kind is declared in Describe through capabilities; a call for a capability that was not
+// declared fails with UNIMPLEMENTED. Within v1 the contract is additive only.
 //
 // Calls that change state report whether they did anything in a `changed` field. Failures, such as
 // an unreachable tool or an invalid request, are returned as gRPC errors instead.
@@ -20,19 +20,17 @@ import "google/protobuf/struct.proto";
 // Shared messages
 // ---------------------------------------------------------------------------------------------
 
-// The integration a call is for: its inputs, including the sensitive ones, needed to reach the
-// tool. A plugin must not persist the sensitive values.
+// The integration a call is for: one connection to the tool, made from the plugin, with its
+// inputs, including the sensitive ones, needed to reach it. A plugin must not persist the
+// sensitive values.
 message Integration {
-  // Which of the plugin's integrations this is, as declared in DescribeResponse.integrations.
-  string kind = 1;
-
   // Values for the inputs declared in IntegrationDefinition.inputs that are not sensitive, keyed
   // by input name.
-  google.protobuf.Struct inputs = 2;
+  google.protobuf.Struct inputs = 1;
 
   // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
   // call only.
-  map<string, string> secrets = 3;
+  map<string, string> secrets = 2;
 }
 
 // Something in the tool that access can be granted to or that can be provisioned.
@@ -180,38 +178,36 @@ message DescribeResponse {
   string name = 1;
   string version = 2;
 
-  // The integrations the plugin offers. Most plugins have one; a plugin that covers several tools,
-  // such as two cloud providers, has one for each.
-  repeated IntegrationDefinition integrations = 3;
+  // The integration the plugin provides. A plugin is exactly one integration; one that needs
+  // several tools takes the credentials for each as inputs.
+  IntegrationDefinition integration = 3;
 }
 
 message IntegrationDefinition {
-  // Unique within the plugin, such as "github".
-  string kind = 1;
-  string title = 2;
-  string description = 3;
+  string title = 1;
+  string description = 2;
 
-  // What is required to create an integration of this kind, credentials included: those are inputs
-  // marked sensitive.
-  repeated InputDefinition inputs = 4;
+  // What is required to create an integration from this plugin, credentials included: those are
+  // inputs marked sensitive.
+  repeated InputDefinition inputs = 3;
 
-  // The resource kinds this integration manages. Kinds are unique within an integration.
-  repeated ResourceDefinition resources = 5;
+  // The resource kinds this integration manages. Kinds are unique within the plugin.
+  repeated ResourceDefinition resources = 4;
 
   // What the integration itself can do.
-  repeated IntegrationCapability capabilities = 6;
+  repeated IntegrationCapability capabilities = 5;
 
   // What can be granted on the integration as a whole. Only meaningful with
   // INTEGRATION_CAPABILITY_ACCESS, and declared the same way as on a resource type: permissions,
   // roles, or both.
-  repeated PermissionDefinition permissions = 7;
-  repeated RoleDefinition roles = 8;
+  repeated PermissionDefinition permissions = 6;
+  repeated RoleDefinition roles = 7;
 
   // The application kinds this integration can run, such as a Laravel app on a host. Applications
   // are a second kind of thing next to resources: they are deployed from a source and have
-  // variables that people edit over time. Kinds are unique within an integration. Empty when the
+  // variables that people edit over time. Kinds are unique within the plugin. Empty when the
   // integration runs no applications.
-  repeated ApplicationDefinition applications = 9;
+  repeated ApplicationDefinition applications = 8;
 }
 
 // One value an integration or a resource takes, declared the way a variable is: a name and a type,
@@ -252,7 +248,7 @@ message OutputDefinition {
 }
 
 message ResourceDefinition {
-  // Unique within the integration, such as "repository".
+  // Unique within the plugin, such as "repository".
   string kind = 1;
   string title = 2;
   string description = 3;
@@ -280,7 +276,7 @@ message ResourceDefinition {
 // and variables whose names are chosen by the people who run it. Every declared application kind
 // can be deployed and has variables, so there is no capability list.
 message ApplicationDefinition {
-  // Unique within the integration, such as "laravel".
+  // Unique within the plugin, such as "laravel".
   string kind = 1;
   string title = 2;
   string description = 3;
@@ -598,14 +594,14 @@ message ApplicationServiceListResponse {
 
 // Mandatory for every plugin.
 service PluginService {
-  // Describes the plugin: what its integrations need (their inputs) and the resources they manage.
+  // Describes the plugin: what its integration needs (its inputs) and the resources it manages.
   rpc Describe(DescribeRequest) returns (DescribeResponse);
 
   // Checks an integration, for example that the inputs are valid and the credentials work.
   rpc Validate(ValidateRequest) returns (ValidateResponse);
 }
 
-// For plugins whose integrations support access as a whole (INTEGRATION_CAPABILITY_ACCESS):
+// For plugins whose integration supports access as a whole (INTEGRATION_CAPABILITY_ACCESS):
 // giving identities roles on the integration, taking them away, and checking what they hold.
 service IntegrationService {
   rpc GrantAccess(IntegrationServiceGrantAccessRequest) returns (IntegrationServiceGrantAccessResponse);
@@ -625,7 +621,7 @@ service ResourceService {
   rpc List(ResourceServiceListRequest) returns (ResourceServiceListResponse);
 }
 
-// For plugins whose integrations run applications (IntegrationDefinition.applications): deployable
+// For plugins whose integration runs applications (IntegrationDefinition.applications): deployable
 // things with a source and open-ended variables.
 service ApplicationService {
   rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse);
