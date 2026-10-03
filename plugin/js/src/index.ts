@@ -53,6 +53,40 @@ type Complete<Message> = Message extends (infer Item)[]
     ? { [Field in keyof Message]: Present<Message[Field]> }
     : Message;
 
+// The request and response of each handler, named for what it handles (the entity, then the call),
+// for annotating your own handlers. A request has its message fields present, and a response may
+// leave fields out.
+export type IntegrationValidateRequest = Complete<contract.ValidateRequest>;
+export type IntegrationValidateResponse = DeepPartial<contract.ValidateResponse>;
+export type IntegrationGrantAccessRequest = Complete<contract.IntegrationServiceGrantAccessRequest>;
+export type IntegrationGrantAccessResponse = DeepPartial<contract.IntegrationServiceGrantAccessResponse>;
+export type IntegrationRevokeAccessRequest = Complete<contract.IntegrationServiceRevokeAccessRequest>;
+export type IntegrationRevokeAccessResponse = DeepPartial<contract.IntegrationServiceRevokeAccessResponse>;
+export type IntegrationGetAccessRequest = Complete<contract.IntegrationServiceGetAccessRequest>;
+export type IntegrationGetAccessResponse = DeepPartial<contract.IntegrationServiceGetAccessResponse>;
+export type ResourceProvisionRequest = Complete<contract.ResourceServiceProvisionRequest>;
+export type ResourceProvisionResponse = DeepPartial<contract.ResourceServiceProvisionResponse>;
+export type ResourceDeprovisionRequest = Complete<contract.ResourceServiceDeprovisionRequest>;
+export type ResourceDeprovisionResponse = DeepPartial<contract.ResourceServiceDeprovisionResponse>;
+export type ResourceListRequest = Complete<contract.ResourceServiceListRequest>;
+export type ResourceListResponse = DeepPartial<contract.ResourceServiceListResponse>;
+export type ResourceGrantAccessRequest = Complete<contract.ResourceServiceGrantAccessRequest>;
+export type ResourceGrantAccessResponse = DeepPartial<contract.ResourceServiceGrantAccessResponse>;
+export type ResourceRevokeAccessRequest = Complete<contract.ResourceServiceRevokeAccessRequest>;
+export type ResourceRevokeAccessResponse = DeepPartial<contract.ResourceServiceRevokeAccessResponse>;
+export type ResourceGetAccessRequest = Complete<contract.ResourceServiceGetAccessRequest>;
+export type ResourceGetAccessResponse = DeepPartial<contract.ResourceServiceGetAccessResponse>;
+export type ApplicationCreateRequest = Complete<contract.ApplicationServiceCreateRequest>;
+export type ApplicationCreateResponse = DeepPartial<contract.ApplicationServiceCreateResponse>;
+export type ApplicationDeleteRequest = Complete<contract.ApplicationServiceDeleteRequest>;
+export type ApplicationDeleteResponse = DeepPartial<contract.ApplicationServiceDeleteResponse>;
+export type ApplicationDeployRequest = Complete<contract.ApplicationServiceDeployRequest>;
+export type ApplicationDeployResponse = DeepPartial<contract.ApplicationServiceDeployResponse>;
+export type ApplicationSetVariablesRequest = Complete<contract.ApplicationServiceSetVariablesRequest>;
+export type ApplicationSetVariablesResponse = DeepPartial<contract.ApplicationServiceSetVariablesResponse>;
+export type ApplicationListRequest = Complete<contract.ApplicationServiceListRequest>;
+export type ApplicationListResponse = DeepPartial<contract.ApplicationServiceListResponse>;
+
 // For a generated service definition, the handler of each call: it takes the request and returns
 // the response, which may leave fields out.
 export type Handlers<Service> = {
