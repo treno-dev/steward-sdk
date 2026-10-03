@@ -1,9 +1,18 @@
-# @steward/plugin
+# @treno-dev/steward-sdk
 
-The JavaScript and TypeScript SDK for writing Steward plugins. A plugin is one integration, like a
-provider: it declares what it needs to connect to a tool and what it manages there, and implements
-the calls Steward makes. The SDK handles everything else: the gRPC services, the handshake with the
-runner, the health check, and routing each call to your handler by kind.
+The Steward SDK for JavaScript and TypeScript. Today it holds the part for writing Steward plugins,
+imported from `@treno-dev/steward-sdk/plugin`. A plugin is one integration: it declares what it needs
+to connect to a system and what it manages there, and implements the calls Steward makes. The SDK
+handles everything else: the gRPC services, the handshake with the runner, the health check, and
+routing each call to your handler by kind.
+
+```sh
+npm install @treno-dev/steward-sdk
+```
+
+```js
+import { createPlugin } from '@treno-dev/steward-sdk/plugin';
+```
 
 Requires Node.js (tested on 24). The package is ES modules and ships its TypeScript types.
 
@@ -30,14 +39,14 @@ so the two never differ.
 <!-- template: ../templates/js/src/plugin.js.tmpl -->
 ```js
 // This is the file you edit. It declares what your plugin offers and implements the calls Steward
-// makes. The gRPC plumbing, the handshake and the health check live in @steward/plugin.
+// makes. The gRPC plumbing, the handshake and the health check live in the Steward SDK.
 //
 // A plugin is one integration, like a provider. Declare it and each kind of resource once, with
 // its handlers attached: Steward's forms and the capabilities of each kind (provisioning,
 // discovery, access) follow from what you write here, and every call is routed to the right
 // handler by kind. If your plugin needs more than one tool, take the credentials for each as inputs.
 
-import { createPlugin } from '@steward/plugin';
+import { createPlugin } from '@treno-dev/steward-sdk/plugin';
 
 // The integration is one connection to the tool. Steward builds its form from `inputs`, so it is
 // also the documentation people see. Mark credentials `sensitive`: they arrive in

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "[[.Title]] plugin for Steward"
 requires-python = ">=3.10"
 dependencies = [
-  "[[if .SDKPath]]steward-plugin @ file://[[.SDKPath]][[else]]steward-plugin>=[[.SDKVersion]][[end]]",
+  "[[if .SDKPath]]treno-dev-steward-sdk @ file://[[.SDKPath]][[else]]treno-dev-steward-sdk>=[[.SDKVersion]][[end]]",
 ]
 
 [tool.setuptools]

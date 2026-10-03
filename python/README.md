@@ -1,9 +1,18 @@
-# steward-plugin
+# treno-dev-steward-sdk
 
-The Python SDK for writing Steward plugins. A plugin is one integration, like a provider: it declares
-what it needs to connect to a tool and what it manages there, and implements the calls Steward makes.
-The SDK handles everything else: the gRPC services, the handshake with the runner, the health check,
-and routing each call to your handler by kind.
+The Steward SDK for Python. Today it holds the part for writing Steward plugins, imported from
+`steward_sdk.plugin`. A plugin is one integration: it declares what it needs to connect to a system and
+what it manages there, and implements the calls Steward makes. The SDK handles everything else: the
+gRPC services, the handshake with the runner, the health check, and routing each call to your handler
+by kind.
+
+```sh
+pip install treno-dev-steward-sdk
+```
+
+```python
+from steward_sdk.plugin import create_plugin
+```
 
 Requires Python 3.10 or newer. The package ships its type hints.
 
@@ -30,7 +39,7 @@ provisioned and given access to. The block below is filled in from the template 
 <!-- template: ../templates/python/src/plugin.py.tmpl -->
 ```python
 # This is the file you edit. It declares what your plugin offers and implements the calls Steward
-# makes. The gRPC plumbing, the handshake and the health check live in steward_plugin.
+# makes. The gRPC plumbing, the handshake and the health check live in the Steward SDK.
 #
 # A plugin is one integration, like a provider. Declare it and each kind of resource once, with
 # its handlers attached: Steward's forms and the capabilities of each kind (provisioning,
@@ -42,7 +51,7 @@ provisioned and given access to. The block below is filled in from the template 
 # generated message, so your editor completes its fields; a response is a message or a plain dict
 # with the fields you have something to say about. Handlers may be async or plain functions.
 
-from steward_plugin import (
+from steward_sdk.plugin import (
     IntegrationValidateRequest,
     IntegrationValidateResponse,
     ResourceDeprovisionRequest,
@@ -266,7 +275,7 @@ plain one runs in a thread, so blocking calls do not stall the plugin).
 Raise a `PluginError` with a gRPC status code to report a specific failure:
 
 ```python
-from steward_plugin import PluginError, StatusCode
+from steward_sdk.plugin import PluginError, StatusCode
 
 raise PluginError(StatusCode.FAILED_PRECONDITION, "APP_KEY is locked and cannot be removed")
 ```
@@ -289,7 +298,7 @@ versions in `buf.gen.yaml` decide the minimum `protobuf` and `grpcio` the packag
 ```sh
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-python scripts/generate.py          # the contract into src/steward_plugin/_gen
+python scripts/generate.py          # the contract into src/steward_sdk/_gen
 python scripts/readme.py            # refill the example above from ../templates/python
 python scripts/readme.py --check    # fail if the example is out of date (for CI)
 python -m build                     # the wheel and sdist, with the generated code

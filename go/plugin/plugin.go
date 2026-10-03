@@ -1,9 +1,9 @@
-// Package steward is the Steward plugin SDK for Go: the plumbing between the plugin contract (gRPC,
-// see ../proto) and the functions a plugin writes.
+// Package plugin is the plugin part of the Steward SDK for Go: the plumbing between the plugin
+// contract (gRPC, see ../../proto) and the functions a plugin writes.
 //
-//	plugin := steward.New(steward.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
-//	plugin.Resource("repository", steward.ResourceOptions{Provision: provision, Deprovision: deprovision})
-//	plugin.Serve()
+//	integration := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
+//	integration.Resource("repository", plugin.ResourceOptions{Provision: provision, Deprovision: deprovision})
+//	integration.Serve()
 //
 // A plugin is one integration, like a provider. It declares that integration and each of its resource
 // or application kinds once, with the handlers attached. The SDK routes every call to the right
@@ -15,7 +15,7 @@
 //
 // Handlers receive and return the generated contract messages. Fail a call with a gRPC status, for
 // example status.Error(codes.FailedPrecondition, "..."); any other error is reported as INTERNAL.
-package steward
+package plugin
 
 import (
 	"context"

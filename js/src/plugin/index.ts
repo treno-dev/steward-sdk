@@ -1,5 +1,7 @@
-// The Steward plugin SDK for JavaScript: the plumbing between the plugin contract (gRPC, see
-// ../proto) and the plain objects a plugin works with.
+// The plugin part of the Steward SDK for JavaScript: the plumbing between the plugin contract (gRPC,
+// see ../../../proto) and the plain objects a plugin works with.
+//
+//   import { createPlugin } from '@treno-dev/steward-sdk/plugin';
 //
 //   const plugin = createPlugin({ name: 'github', version: '0.1.0', inputs: [...], validate });
 //   plugin.resource({ kind: 'repository', inputs: [...], provision, deprovision, list });
@@ -30,10 +32,10 @@ import type {
   PermissionDefinition,
   ResourceDefinition,
   RoleDefinition,
-} from './gen/steward/plugin/v1/plugin.js';
-import * as contract from './gen/steward/plugin/v1/plugin.js';
+} from '../gen/steward/plugin/v1/plugin.js';
+import * as contract from '../gen/steward/plugin/v1/plugin.js';
 
-export * from './gen/steward/plugin/v1/plugin.js';
+export * from '../gen/steward/plugin/v1/plugin.js';
 
 const { HealthImplementation } = healthCheck;
 

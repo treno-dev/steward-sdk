@@ -1,4 +1,4 @@
-package steward
+package plugin
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 func Struct(values map[string]any) *structpb.Struct {
 	result, err := structpb.NewStruct(values)
 	if err != nil {
-		panic(fmt.Sprintf("steward.Struct: %v", err))
+		panic(fmt.Sprintf("plugin.Struct: %v", err))
 	}
 
 	return result
@@ -26,7 +26,7 @@ func Struct(values map[string]any) *structpb.Struct {
 func Value(value any) *structpb.Value {
 	result, err := structpb.NewValue(value)
 	if err != nil {
-		panic(fmt.Sprintf("steward.Value: %v", err))
+		panic(fmt.Sprintf("plugin.Value: %v", err))
 	}
 
 	return result

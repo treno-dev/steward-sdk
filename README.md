@@ -166,7 +166,7 @@ This is the heart of what that generates, shortened. The full file, with every c
 is [`templates/js/src/plugin.js.tmpl`](templates/js/src/plugin.js.tmpl).
 
 ```js
-import { createPlugin } from '@steward/plugin';
+import { createPlugin } from '@treno-dev/steward-sdk/plugin';
 
 // The integration: what it takes to connect to the tool.
 const plugin = createPlugin({
@@ -236,19 +236,23 @@ gRPC status code. Logs go to stderr, because stdout is reserved for the handshak
 
 The other languages follow the same shape, in their own idiom:
 
-| Language | Declare | A handler |
-|---|---|---|
-| JavaScript, TypeScript | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ integration, name }) { ... }` |
-| Python | `create_plugin(...)`, `plugin.resource(kind=..., ...)` | `async def provision(request): ...` |
-| Go | `steward.New(...)`, `plugin.Resource("kind", ...)` | `func(ctx, *Request) (*Response, error)` |
+| Language | Install | Declare | A handler |
+|---|---|---|---|
+| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk` | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ integration, name }) { ... }` |
+| Python | `pip install treno-dev-steward-sdk` | `create_plugin(...)`, `plugin.resource(kind=..., ...)` | `async def provision(request): ...` |
+| Go | `go get github.com/treno-dev/steward-sdk/go` | `plugin.New(...)`, `integration.Resource("kind", ...)` | `func(ctx, *Request) (*Response, error)` |
+
+Each is one SDK package per language, and the plugin code is its `plugin` part: `@treno-dev/steward-sdk/plugin`
+in JavaScript, `steward_sdk.plugin` in Python and `…/go/plugin` in Go. Other parts of the SDK will sit
+beside it, under the same package name.
 
 ## What is here
 
 | | |
 |---|---|
 | [`proto/`](proto) | The contract, with `buf` lint and breaking-change checks. |
-| [`js/`](js) | `@steward/plugin` for JavaScript and TypeScript. |
-| [`python/`](python) | `steward-plugin` for Python. |
+| [`js/`](js) | `@treno-dev/steward-sdk` for JavaScript and TypeScript. |
+| [`python/`](python) | `treno-dev-steward-sdk` for Python, imported as `steward_sdk`. |
 | [`go/`](go) | The Go module, `github.com/treno-dev/steward-sdk/go`. |
 | [`templates/`](templates) | One template per language (`js`, `ts`, `python`, `go`), the projects `steward plugin init` writes. |
 

@@ -59,9 +59,67 @@ jobs:
     uses: ./.github/workflows/ci.yml
     secrets: inherit
 
+  npm:
+    name: Publish to npm
+    needs: [guard, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: js
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+          token: ${{ secrets.BUF_TOKEN }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: Publish with provenance, using the trusted publisher
+        run: npm publish --provenance --access public ${{ needs.guard.outputs.prerelease == 'true' && '--tag next' || '' }}
+
+  pypi:
+    name: Publish to PyPI
+    needs: [guard, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+          token: ${{ secrets.BUF_TOKEN }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel and the source distribution
+        working-directory: python
+        run: |
+          pip install build
+          python scripts/generate.py
+          python -m build
+
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
+        with:
+          packages-dir: python/dist/
+
   release:
     name: Publish the release
-    needs: [guard, ci]
+    needs: [guard, ci, npm, pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: write

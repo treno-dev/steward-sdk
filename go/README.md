@@ -1,9 +1,18 @@
-# Steward plugin SDK for Go
+# Steward SDK for Go
 
-The Go SDK for writing Steward plugins. A plugin is one integration, like a provider: it declares what
-it needs to connect to a tool and what it manages there, and implements the calls Steward makes. The
-SDK handles everything else: the gRPC services, the handshake with the runner, the health check, and
-routing each call to your handler by kind.
+The Steward SDK for Go. Today it holds the part for writing Steward plugins, in the package
+`github.com/treno-dev/steward-sdk/go/plugin`. A plugin is one integration: it declares what it needs to
+connect to a system and what it manages there, and implements the calls Steward makes. The SDK handles
+everything else: the gRPC services, the handshake with the runner, the health check, and routing each
+call to your handler by kind.
+
+```sh
+go get github.com/treno-dev/steward-sdk/go
+```
+
+```go
+import "github.com/treno-dev/steward-sdk/go/plugin"
+```
 
 Requires Go 1.25 or newer.
 
@@ -22,24 +31,24 @@ it depends on. To work on the SDK and its templates together, point it at a loca
 
 The generated plugin, with a resource that can be provisioned and given access to, is
 [`../templates/go/main.go.tmpl`](../templates/go/main.go.tmpl). A plugin needs one
-`steward.New(...)`, any number of `plugin.Resource(...)` and `plugin.Application(...)` declarations,
-and a final `plugin.Serve()`. If it needs more than one tool, for example both Cloudflare and AWS, take
-the credentials for each as inputs.
+`plugin.New(...)`, any number of `Resource(...)` and `Application(...)` declarations, and a final
+`Serve()`. If it needs more than one tool, for example both Cloudflare and AWS, take the credentials for
+each as inputs.
 
 ```go
-plugin := steward.New(steward.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
+integration := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
 
-plugin.Resource("repository", steward.ResourceOptions{
+integration.Resource("repository", plugin.ResourceOptions{
 	Provision:   provision,
 	Deprovision: deprovision,
 })
 
-plugin.Serve()
+integration.Serve()
 ```
 
 ## What you declare
 
-**The integration**, in `steward.Options`:
+**The integration**, in `plugin.Options`:
 
 | Field | |
 |---|---|
@@ -49,8 +58,8 @@ plugin.Serve()
 | `Validate` | Checks the inputs and credentials. Returns `ValidationError`s the user can fix. |
 | `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the integration as a whole, such as membership of an organization. |
 
-**A resource**, with `plugin.Resource("kind", steward.ResourceOptions{...})`, and **an application**,
-with `plugin.Application("kind", steward.ApplicationOptions{...})`, are each declared under a kind that
+**A resource**, with `integration.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,
+with `integration.Application("kind", plugin.ApplicationOptions{...})`, are each declared under a kind that
 is unique within the plugin, such as `"repository"`, and take a `Title`, a `Description`, `Inputs` and
 `Outputs`. Resources also take `Roles` and `Permissions`.
 Applications take `Sources` (`"git"`, `"image"`).
@@ -58,7 +67,7 @@ Applications take `Sources` (`"git"`, `"image"`).
 **Inputs and outputs** are declared like variables:
 
 ```go
-&steward.InputDefinition{Name: "visibility", Label: "Visibility", Type: steward.TypeSelect, Options: []string{"private", "public"}}
+&plugin.InputDefinition{Name: "visibility", Label: "Visibility", Type: plugin.TypeSelect, Options: []string{"private", "public"}}
 ```
 
 `Type` is one of `TypeString`, `TypeNumber`, `TypeBoolean`, `TypeSelect`, `TypeList` (of strings) or
@@ -69,9 +78,9 @@ Applications take `Sources` (`"git"`, `"image"`).
 Access exists at two levels, each with the same three handlers, `GrantAccess`, `RevokeAccess` and
 `GetAccess`:
 
-- **The integration**, in `steward.Options`: membership of the tool as a whole, such as an organization
+- **The integration**, in `plugin.Options`: membership of the tool as a whole, such as an organization
   or a site. Steward grants this first, then access to the resources.
-- **A resource kind**, in `steward.ResourceOptions`: a role on one resource, such as a repository.
+- **A resource kind**, in `plugin.ResourceOptions`: a role on one resource, such as a repository.
 
 What you declare with `Roles` (and, for tools that expose them, `Permissions`) is what Steward offers
 for assignment. A role has a `Name` and the `Permissions` it contains, and a permission is a `Name`
@@ -114,8 +123,8 @@ generated contract messages, re-exported by the package so a plugin imports one 
   on one for a plain `map[string]any` (numbers arrive as `float64`). Sensitive values arrive in
   `Integration.Secrets` (and a resource's or application's `Secrets`) as a `map[string]string`. Never
   store them.
-- **Open-ended values in a response**, such as `Outputs`, are built with `steward.Struct(map[string]any{...})`,
-  and an input's `Default` with `steward.Value(...)`. They take what JSON can hold; anything else
+- **Open-ended values in a response**, such as `Outputs`, are built with `plugin.Struct(map[string]any{...})`,
+  and an input's `Default` with `plugin.Value(...)`. They take what JSON can hold; anything else
   panics, which the SDK reports as an `INTERNAL` error with the stack on stderr, as it does for any
   panic in a handler.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating what

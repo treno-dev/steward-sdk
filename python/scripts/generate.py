@@ -1,4 +1,4 @@
-"""Generates the contract's Python messages and gRPC services into src/steward_plugin/_gen, with buf.
+"""Generates the contract's Python messages and gRPC services into src/steward_sdk/_gen, with buf.
 
 The generated code is not committed. Run it before building or testing the package:
 
@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "src" / "steward_plugin" / "_gen"
+OUT = ROOT / "src" / "steward_sdk" / "_gen"
 
 
 def main() -> int:
@@ -29,7 +29,7 @@ def main() -> int:
     grpc_module.write_text(
         source.replace(
             "from steward.plugin.v1 import plugin_pb2",
-            "from steward_plugin._gen.steward.plugin.v1 import plugin_pb2",
+            "from steward_sdk._gen.steward.plugin.v1 import plugin_pb2",
         )
     )
 

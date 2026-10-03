@@ -15,8 +15,8 @@ from google.protobuf.message import Message
 from grpc import StatusCode
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
-from steward_plugin._gen.steward.plugin.v1 import plugin_pb2 as contract
-from steward_plugin._gen.steward.plugin.v1 import plugin_pb2_grpc as services
+from steward_sdk._gen.steward.plugin.v1 import plugin_pb2 as contract
+from steward_sdk._gen.steward.plugin.v1 import plugin_pb2_grpc as services
 
 # The version of the Steward plugin contract this plugin speaks.
 APP_PROTOCOL_VERSION = 1

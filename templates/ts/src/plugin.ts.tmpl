@@ -1,5 +1,5 @@
 // This is the file you edit. It declares what your plugin offers and implements the calls Steward
-// makes. The gRPC plumbing, the handshake and the health check live in @steward/plugin.
+// makes. The gRPC plumbing, the handshake and the health check live in the Steward SDK.
 //
 // A plugin is one integration, like a provider. Declare it and each kind of resource once, with
 // its handlers attached: Steward's forms and the capabilities of each kind (provisioning,
@@ -24,7 +24,7 @@ import {
   type ResourceProvisionResponse,
   type ResourceRevokeAccessRequest,
   type ResourceRevokeAccessResponse,
-} from '@steward/plugin';
+} from '@treno-dev/steward-sdk/plugin';
 
 // The integration is one connection to the tool. Steward builds its form from `inputs`, so it is
 // also the documentation people see. Mark credentials `sensitive`: they arrive in
