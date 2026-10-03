@@ -3,41 +3,41 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
-	"os/signal"
 	"runtime/debug"
-	"syscall"
 
+	goplugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/health"
-	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 
 	pluginv1 "github.com/treno-dev/steward-sdk/go/gen/steward/plugin/v1"
 )
 
-// The version of the Steward plugin contract this plugin speaks.
-const appProtocolVersion = 1
-
-// Serve starts serving the plugin and blocks until the runner stops it. It prints the handshake line
-// the runner reads, so nothing else may be written to standard output. A plugin that cannot start
-// exits with status 1.
+// Serve starts serving the plugin and blocks until the runner stops it. It is hashicorp/go-plugin that
+// does the work the runner depends on: it listens on a unix socket (TCP on Windows), prints the
+// handshake line, answers the health check for the service "plugin", and shuts down when asked.
+//
+// A plugin must be started by a runner, which sets what Handshake describes in its environment. Started
+// by hand, it says so and exits, so run it with `steward plugin validate` instead.
 func (p *Plugin) Serve() {
-	if err := p.serve(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	goplugin.Serve(&goplugin.ServeConfig{
+		HandshakeConfig: Handshake,
+		Plugins:         goplugin.PluginSet{Name: &grpcPlugin{plugin: p}},
+		GRPCServer: func(options []grpc.ServerOption) *grpc.Server {
+			return goplugin.DefaultGRPCServer(append(options, grpc.ChainUnaryInterceptor(recoverPanics)))
+		},
+	})
 }
 
-func (p *Plugin) serve() error {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return err
-	}
+// grpcPlugin registers the services of the plugin with the gRPC server that go-plugin runs.
+type grpcPlugin struct {
+	goplugin.NetRPCUnsupportedPlugin
+	plugin *Plugin
+}
 
-	server := grpc.NewServer(grpc.ChainUnaryInterceptor(recoverPanics))
+func (g *grpcPlugin) GRPCServer(_ *goplugin.GRPCBroker, server *grpc.Server) error {
+	p := g.plugin
 
 	pluginv1.RegisterPluginServiceServer(server, pluginService{plugin: p})
 
@@ -53,22 +53,18 @@ func (p *Plugin) serve() error {
 		pluginv1.RegisterApplicationServiceServer(server, applicationService{plugin: p})
 	}
 
-	checks := health.NewServer()
-	checks.SetServingStatus("plugin", healthpb.HealthCheckResponse_SERVING)
-	healthpb.RegisterHealthServer(server, checks)
+	return nil
+}
 
-	// CORE-PROTOCOL-VERSION | APP-PROTOCOL-VERSION | NETWORK-TYPE | NETWORK-ADDR | PROTOCOL
-	fmt.Printf("1|%d|tcp|%s|grpc\n", appProtocolVersion, listener.Addr())
+// GRPCClient is the runner's side. A runner uses the connection as it is, with the generated clients.
+func (g *grpcPlugin) GRPCClient(_ context.Context, _ *goplugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
+	return conn, nil
+}
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-signals
-		server.GracefulStop()
-	}()
-
-	return server.Serve(listener)
+// ClientPlugin is what a runner passes to go-plugin, under Name, so that it gets the gRPC connection
+// back from Dispense.
+func ClientPlugin() goplugin.Plugin {
+	return &grpcPlugin{}
 }
 
 // recoverPanics reports a panic in a handler as an INTERNAL error, with its stack on stderr, instead
@@ -98,8 +94,9 @@ func (s pluginService) Describe(context.Context, *pluginv1.DescribeRequest) (*pl
 }
 
 func (s pluginService) Validate(ctx context.Context, request *IntegrationValidateRequest) (*IntegrationValidateResponse, error) {
+	// Every plugin must answer Validate; without a handler of its own, every integration is accepted.
 	if s.plugin.options.Validate == nil {
-		return nil, unimplemented("validate", "integration")
+		return &IntegrationValidateResponse{}, nil
 	}
 
 	return s.plugin.options.Validate(ctx, request)

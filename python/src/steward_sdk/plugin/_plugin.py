@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import os
+import secrets
 import signal
 import sys
 import traceback
@@ -16,10 +18,14 @@ from grpc import StatusCode
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
 from steward_sdk._gen.steward.plugin.v1 import plugin_pb2 as contract
-from steward_sdk._gen.steward.plugin.v1 import plugin_pb2_grpc as services
 
 # The version of the Steward plugin contract this plugin speaks.
 APP_PROTOCOL_VERSION = 1
+
+# A runner sets this cookie in the environment of every plugin it starts, as hashicorp/go-plugin does.
+# A plugin that does not find it was started by hand. Kept in step with go/plugin/handshake.go.
+MAGIC_COOKIE_KEY = "STEWARD_PLUGIN"
+MAGIC_COOKIE_VALUE = "b6d7a1f2-steward-plugin"
 
 # The request of each handler, named for what it handles (the entity, then the call), for annotating
 # your own handlers. They are the generated messages: fields are snake_case, a message that was not
@@ -195,7 +201,16 @@ class Plugin:
         )
 
     def serve(self) -> None:
-        """Starts serving the plugin. The runner stops it when it is done."""
+        """Starts serving the plugin. The runner stops it when it is done.
+
+        A plugin is started by a runner, which sets the environment this checks. Started by hand, it says
+        so and exits, so try it with `steward plugin validate` instead.
+        """
+        if os.environ.get(MAGIC_COOKIE_KEY) != MAGIC_COOKIE_VALUE:
+            print("This program is a Steward plugin. It is started by a runner, not run directly.", file=sys.stderr)
+            print("To try it, use `steward plugin validate` or `steward plugin run`.", file=sys.stderr)
+            sys.exit(1)
+
         asyncio.run(_serve(self))
 
 
@@ -318,12 +333,13 @@ def _owner(plugin: Plugin, target: str, request: Message) -> Mapping[str, Handle
     return kinds[kind].handlers
 
 
-def _method(descriptor: Any, routed: Callable[[Message], Awaitable[Any]]) -> Callable[..., Awaitable[Message]]:
+def _handler(descriptor: Any, routed: Callable[[Message], Awaitable[Any]]) -> grpc.RpcMethodHandler:
+    request = message_factory.GetMessageClass(descriptor.input_type)
     response = message_factory.GetMessageClass(descriptor.output_type)
 
-    async def method(self: Any, request: Message, context: grpc.aio.ServicerContext) -> Message:
+    async def method(message: Message, context: grpc.aio.ServicerContext) -> Message:
         try:
-            return _response(await routed(request), response)
+            return _response(await routed(message), response)
         except PluginError as error:
             await context.abort(error.code, error.message)
         except Exception as error:
@@ -332,23 +348,56 @@ def _method(descriptor: Any, routed: Callable[[Message], Awaitable[Any]]) -> Cal
 
         raise AssertionError("unreachable")
 
-    return method
+    return grpc.unary_unary_rpc_method_handler(
+        method,
+        request_deserializer=request.FromString,
+        response_serializer=response.SerializeToString,
+    )
 
 
-# Builds the servicer for a service: each routed call is the method of the same name, and anything
-# else keeps the generated default, which answers UNIMPLEMENTED.
-def _servicer(service: str, base: type, routes: Mapping[str, Callable[[Message], Awaitable[Any]]]) -> Any:
+# Serves a service from the generated descriptor, with a handler for each routed call. A call without one
+# is not registered, and gRPC itself answers UNIMPLEMENTED, as the generated servicer would. Doing this
+# here means only the messages are generated, so no generated code has to be patched.
+def _register(server: grpc.aio.Server, service: str, routes: Mapping[str, Callable[[Message], Awaitable[Any]]]) -> None:
     descriptor = contract.DESCRIPTOR.services_by_name[service]
-    methods = {
-        name: _method(descriptor.methods_by_name[name], routed)
-        for name, routed in ((_pascal(call), routed) for call, routed in routes.items())
+    handlers = {
+        _pascal(call): _handler(descriptor.methods_by_name[_pascal(call)], routed) for call, routed in routes.items()
     }
 
-    return type(f"{service}Servicer", (base,), methods)()
+    server.add_generic_rpc_handlers((grpc.method_handlers_generic_handler(descriptor.full_name, handlers),))
 
 
 def _routes(plugin: Plugin, calls: Sequence[str], target: str) -> dict[str, Callable[[Message], Awaitable[Any]]]:
     return {call: _route(plugin, call, target) for call in calls}
+
+
+def _listen() -> tuple[str, str]:
+    """Where to listen, and what to announce: a unix socket in the directory the runner made for it, when
+    it set one, which only the runner's user can open; otherwise a port on the loopback interface, which
+    is announced once it is known."""
+    directory = os.environ.get("PLUGIN_UNIX_SOCKET_DIR")
+
+    if directory and sys.platform != "win32":
+        path = os.path.join(directory, f"plugin-{secrets.token_hex(6)}")
+
+        return f"unix:{path}", f"unix|{path}"
+
+    return "127.0.0.1:0", ""
+
+
+def _shutdown(server: grpc.aio.Server) -> grpc.GenericRpcHandler:
+    """Serves the call go-plugin makes to ask a plugin to shut down, so that it exits at once and the
+    runner does not wait for it. It has no generated code, since its messages are empty."""
+
+    async def shutdown(_request: bytes, _context: grpc.aio.ServicerContext) -> bytes:
+        asyncio.ensure_future(server.stop(grace=1))
+
+        return b""
+
+    return grpc.method_handlers_generic_handler(
+        "plugin.GRPCController",
+        {"Shutdown": grpc.unary_unary_rpc_method_handler(shutdown)},
+    )
 
 
 async def _serve(plugin: Plugin) -> None:
@@ -357,42 +406,35 @@ async def _serve(plugin: Plugin) -> None:
     async def describe(_request: Message) -> Message:
         return plugin.describe()
 
-    services.add_PluginServiceServicer_to_server(
-        _servicer(
-            "PluginService",
-            services.PluginServiceServicer,
-            {"describe": describe, "validate": _route(plugin, "validate", "integration")},
-        ),
-        server,
-    )
+    # Every plugin must answer Validate; without a handler of its own, every integration is accepted.
+    async def accept(_request: Message) -> None:
+        return None
+
+    validate = _route(plugin, "validate", "integration") if "validate" in plugin.handlers else accept
+
+    _register(server, "PluginService", {"describe": describe, "validate": validate})
 
     if any(call in plugin.handlers for call in ACCESS_CALLS):
-        services.add_IntegrationServiceServicer_to_server(
-            _servicer("IntegrationService", services.IntegrationServiceServicer, _routes(plugin, ACCESS_CALLS, "integration")),
-            server,
-        )
+        _register(server, "IntegrationService", _routes(plugin, ACCESS_CALLS, "integration"))
 
     if plugin.resources:
-        services.add_ResourceServiceServicer_to_server(
-            _servicer("ResourceService", services.ResourceServiceServicer, _routes(plugin, RESOURCE_CALLS, "resource")),
-            server,
-        )
+        _register(server, "ResourceService", _routes(plugin, RESOURCE_CALLS, "resource"))
 
     if plugin.applications:
-        services.add_ApplicationServiceServicer_to_server(
-            _servicer("ApplicationService", services.ApplicationServiceServicer, _routes(plugin, APPLICATION_CALLS, "application")),
-            server,
-        )
+        _register(server, "ApplicationService", _routes(plugin, APPLICATION_CALLS, "application"))
 
     status = health.aio.HealthServicer()
     health_pb2_grpc.add_HealthServicer_to_server(status, server)
     await status.set("plugin", health_pb2.HealthCheckResponse.SERVING)
 
-    port = server.add_insecure_port("127.0.0.1:0")
+    server.add_generic_rpc_handlers((_shutdown(server),))
+
+    bind, announced = _listen()
+    port = server.add_insecure_port(bind)
     await server.start()
 
     # CORE-PROTOCOL-VERSION | APP-PROTOCOL-VERSION | NETWORK-TYPE | NETWORK-ADDR | PROTOCOL
-    print(f"1|{APP_PROTOCOL_VERSION}|tcp|127.0.0.1:{port}|grpc", flush=True)
+    print(f"1|{APP_PROTOCOL_VERSION}|{announced or f'tcp|127.0.0.1:{port}'}|grpc", flush=True)
 
     loop = asyncio.get_running_loop()
 

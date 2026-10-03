@@ -81,7 +81,7 @@ type ApplicationOptions struct {
 	Inputs  []*InputDefinition
 	Outputs []*OutputDefinition
 
-	// Sources is what it can be deployed from: "git" or "image".
+	// Sources are the source types it can be deployed from: "github", "registry", "s3" or "raw".
 	Sources []string
 
 	Create       func(context.Context, *ApplicationCreateRequest) (*ApplicationCreateResponse, error)

@@ -19,6 +19,9 @@
 // Messages are generated from the contract, which also turns google.protobuf.Struct into plain
 // objects, so handlers never deal with protobuf values.
 
+import { randomBytes } from 'node:crypto';
+import { join } from 'node:path';
+
 import * as grpc from '@grpc/grpc-js';
 
 import healthCheck from 'grpc-health-check';
@@ -41,6 +44,11 @@ const { HealthImplementation } = healthCheck;
 
 // The version of the Steward plugin contract this plugin speaks.
 const APP_PROTOCOL_VERSION = 1;
+
+// A runner sets this cookie in the environment of every plugin it starts, as hashicorp/go-plugin does.
+// A plugin that does not find it was started by hand. Kept in step with go/plugin/handshake.go.
+const MAGIC_COOKIE_KEY = 'STEWARD_PLUGIN';
+const MAGIC_COOKIE_VALUE = 'b6d7a1f2-steward-plugin';
 
 type MaybePromise<T> = T | Promise<T>;
 
@@ -354,7 +362,53 @@ function routes(plugin: Plugin, calls: readonly string[], target: Target, kindOf
   return Object.fromEntries(calls.map((call) => [call, plugin.route(call, target, kindOf)]));
 }
 
+// Where to listen: a unix socket in the directory the runner made for it, when it set one, which only the
+// runner's user can open; otherwise a port on the loopback interface.
+function listenAddress(): { bind: string; announce: (port: number) => string } {
+  const directory = process.env.PLUGIN_UNIX_SOCKET_DIR;
+
+  if (directory && process.platform !== 'win32') {
+    const path = join(directory, `plugin-${randomBytes(6).toString('hex')}`);
+
+    return { bind: `unix:${path}`, announce: () => `unix|${path}` };
+  }
+
+  return { bind: '127.0.0.1:0', announce: (port) => `tcp|127.0.0.1:${port}` };
+}
+
+// Serves the call go-plugin makes to ask a plugin to shut down, so that it exits at once and the
+// runner does not wait for it. It has no generated code, since its messages are empty.
+function addShutdown(server: grpc.Server, stop: () => void): void {
+  const empty = { serialize: () => Buffer.alloc(0), deserialize: () => ({}) };
+
+  server.addService(
+    {
+      Shutdown: {
+        path: '/plugin.GRPCController/Shutdown',
+        requestStream: false,
+        responseStream: false,
+        requestSerialize: empty.serialize,
+        requestDeserialize: empty.deserialize,
+        responseSerialize: empty.serialize,
+        responseDeserialize: empty.deserialize,
+      },
+    },
+    {
+      Shutdown: (_call: unknown, callback: grpc.sendUnaryData<unknown>) => {
+        callback(null, {});
+        setImmediate(stop);
+      },
+    },
+  );
+}
+
 function serve(plugin: Plugin): void {
+  if (process.env[MAGIC_COOKIE_KEY] !== MAGIC_COOKIE_VALUE) {
+    console.error('This program is a Steward plugin. It is started by a runner, not run directly.');
+    console.error('To try it, use `steward plugin validate` or `steward plugin run`.');
+    process.exit(1);
+  }
+
   const server = new grpc.Server();
   const anyResource = plugin.resources.size > 0;
   const anyApplication = plugin.applications.size > 0;
@@ -362,7 +416,8 @@ function serve(plugin: Plugin): void {
 
   server.addService(contract.PluginServiceService, implement(contract.PluginServiceService, {
     describe: () => plugin.describe(),
-    validate: plugin.route('validate', 'integration'),
+    // Every plugin must answer Validate; without a handler of its own, every integration is accepted.
+    validate: plugin.options.validate ? plugin.route('validate', 'integration') : () => ({}),
   }));
 
   if (anyAccess) {
@@ -396,17 +451,23 @@ function serve(plugin: Plugin): void {
 
   new HealthImplementation({ plugin: 'SERVING' }).addToServer(server);
 
-  server.bindAsync('127.0.0.1:0', grpc.ServerCredentials.createInsecure(), (error, port) => {
+  const stop = () => server.tryShutdown(() => process.exit(0));
+
+  addShutdown(server, stop);
+
+  const { bind, announce } = listenAddress();
+
+  server.bindAsync(bind, grpc.ServerCredentials.createInsecure(), (error, port) => {
     if (error) {
       console.error(error.message);
       process.exit(1);
     }
 
     // CORE-PROTOCOL-VERSION | APP-PROTOCOL-VERSION | NETWORK-TYPE | NETWORK-ADDR | PROTOCOL
-    console.log(`1|${APP_PROTOCOL_VERSION}|tcp|127.0.0.1:${port}|grpc`);
+    console.log(`1|${APP_PROTOCOL_VERSION}|${announce(port)}|grpc`);
   });
 
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.on(signal, () => server.tryShutdown(() => process.exit(0)));
+    process.on(signal, stop);
   }
 }

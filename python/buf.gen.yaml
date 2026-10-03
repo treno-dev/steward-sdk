@@ -7,5 +7,3 @@ plugins:
     out: src/steward_sdk/_gen
   - remote: buf.build/protocolbuffers/pyi:v36.2
     out: src/steward_sdk/_gen
-  - remote: buf.build/grpc/python:v1.84.0
-    out: src/steward_sdk/_gen
