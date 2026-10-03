@@ -1,0 +1,10 @@
+.DS_Store
+.idea
+.vscode
+.zed
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Where pack-templates.sh is usually pointed
+/out/
