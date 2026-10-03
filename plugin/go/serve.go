@@ -6,11 +6,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 
 	pluginv1 "github.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1"
 )
@@ -34,7 +37,7 @@ func (p *Plugin) serve() error {
 		return err
 	}
 
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.ChainUnaryInterceptor(recoverPanics))
 
 	pluginv1.RegisterPluginServiceServer(server, pluginService{plugin: p})
 
@@ -50,9 +53,9 @@ func (p *Plugin) serve() error {
 		pluginv1.RegisterApplicationServiceServer(server, applicationService{plugin: p})
 	}
 
-	status := health.NewServer()
-	status.SetServingStatus("plugin", healthpb.HealthCheckResponse_SERVING)
-	healthpb.RegisterHealthServer(server, status)
+	checks := health.NewServer()
+	checks.SetServingStatus("plugin", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(server, checks)
 
 	// CORE-PROTOCOL-VERSION | APP-PROTOCOL-VERSION | NETWORK-TYPE | NETWORK-ADDR | PROTOCOL
 	fmt.Printf("1|%d|tcp|%s|grpc\n", appProtocolVersion, listener.Addr())
@@ -66,6 +69,19 @@ func (p *Plugin) serve() error {
 	}()
 
 	return server.Serve(listener)
+}
+
+// recoverPanics reports a panic in a handler as an INTERNAL error, with its stack on stderr, instead
+// of letting it take the whole plugin down.
+func recoverPanics(ctx context.Context, request any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (response any, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			fmt.Fprintf(os.Stderr, "panic in handler: %v\n%s", recovered, debug.Stack())
+			err = status.Error(codes.Internal, fmt.Sprint(recovered))
+		}
+	}()
+
+	return handler(ctx, request)
 }
 
 // The services route each call to the handler of the same name on the integration or on the kind the

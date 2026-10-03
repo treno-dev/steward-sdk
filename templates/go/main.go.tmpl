@@ -16,8 +16,6 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/structpb"
-
 	steward "github.com/treno-dev/steward/sdk/plugin/go"
 )
 
@@ -40,14 +38,9 @@ func validate(ctx context.Context, request *steward.IntegrationValidateRequest) 
 func provision(ctx context.Context, request *steward.ResourceProvisionRequest) (*steward.ResourceProvisionResponse, error) {
 	baseURL := request.GetIntegration().GetInputs().AsMap()["base_url"]
 
-	outputs, err := structpb.NewStruct(map[string]any{
-		"url": fmt.Sprintf("%v/items/%s", baseURL, request.GetName()),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &steward.ResourceProvisionResponse{Outputs: outputs}, nil
+	return &steward.ResourceProvisionResponse{
+		Outputs: steward.Struct(map[string]any{"url": fmt.Sprintf("%v/items/%s", baseURL, request.GetName())}),
+	}, nil
 }
 
 // Remove a resource. Idempotent: succeed if it is already gone. The request has the Integration and
@@ -94,8 +87,7 @@ func main() {
 	})
 
 	// A kind of resource this integration manages.
-	plugin.Resource(steward.ResourceKind{
-		Kind:        "item",
+	plugin.Resource("item", steward.ResourceOptions{
 		Title:       "Item",
 		Description: "An example resource.",
 

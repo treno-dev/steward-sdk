@@ -1,6 +1,36 @@
 package steward
 
-import pluginv1 "github.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1"
+import (
+	"fmt"
+
+	"google.golang.org/protobuf/types/known/structpb"
+
+	pluginv1 "github.com/treno-dev/steward/sdk/plugin/go/gen/steward/plugin/v1"
+)
+
+// Struct turns a map into the Struct the contract uses for open-ended values, such as a response's
+// Outputs or an identity's Attrs. Values must be what JSON can hold (strings, numbers, booleans, nil,
+// and maps and slices of those). Anything else is a mistake in the plugin, so it panics, and the SDK
+// reports a panic in a handler as an INTERNAL error.
+func Struct(values map[string]any) *structpb.Struct {
+	result, err := structpb.NewStruct(values)
+	if err != nil {
+		panic(fmt.Sprintf("steward.Struct: %v", err))
+	}
+
+	return result
+}
+
+// Value turns a Go value into the Value the contract uses for an input's Default. Same rules as
+// Struct.
+func Value(value any) *structpb.Value {
+	result, err := structpb.NewValue(value)
+	if err != nil {
+		panic(fmt.Sprintf("steward.Value: %v", err))
+	}
+
+	return result
+}
 
 // The messages a plugin works with, from the generated contract, so a plugin imports one package.
 // Requests and responses are named for what they handle (the entity, then the call).
@@ -42,16 +72,16 @@ type (
 	ResourceGetAccessRequest     = pluginv1.ResourceServiceGetAccessRequest
 	ResourceGetAccessResponse    = pluginv1.ResourceServiceGetAccessResponse
 
-	ApplicationCreateRequest         = pluginv1.ApplicationServiceCreateRequest
-	ApplicationCreateResponse        = pluginv1.ApplicationServiceCreateResponse
-	ApplicationDeleteRequest         = pluginv1.ApplicationServiceDeleteRequest
-	ApplicationDeleteResponse        = pluginv1.ApplicationServiceDeleteResponse
-	ApplicationDeployRequest         = pluginv1.ApplicationServiceDeployRequest
-	ApplicationDeployResponse        = pluginv1.ApplicationServiceDeployResponse
-	ApplicationSetVariablesRequest   = pluginv1.ApplicationServiceSetVariablesRequest
-	ApplicationSetVariablesResponse  = pluginv1.ApplicationServiceSetVariablesResponse
-	ApplicationListRequest           = pluginv1.ApplicationServiceListRequest
-	ApplicationListResponse          = pluginv1.ApplicationServiceListResponse
+	ApplicationCreateRequest        = pluginv1.ApplicationServiceCreateRequest
+	ApplicationCreateResponse       = pluginv1.ApplicationServiceCreateResponse
+	ApplicationDeleteRequest        = pluginv1.ApplicationServiceDeleteRequest
+	ApplicationDeleteResponse       = pluginv1.ApplicationServiceDeleteResponse
+	ApplicationDeployRequest        = pluginv1.ApplicationServiceDeployRequest
+	ApplicationDeployResponse       = pluginv1.ApplicationServiceDeployResponse
+	ApplicationSetVariablesRequest  = pluginv1.ApplicationServiceSetVariablesRequest
+	ApplicationSetVariablesResponse = pluginv1.ApplicationServiceSetVariablesResponse
+	ApplicationListRequest          = pluginv1.ApplicationServiceListRequest
+	ApplicationListResponse         = pluginv1.ApplicationServiceListResponse
 )
 
 // The types an InputDefinition or OutputDefinition can have.

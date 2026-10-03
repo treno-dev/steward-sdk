@@ -19,7 +19,7 @@ Steward calls: `Provision`, `Deprovision`, `GrantAccess`, `RevokeAccess` and `Ge
 and return the typed messages of the contract. Leave out the handlers you do not need: Steward offers
 only what you implement.
 
-To add a kind of resource, call `plugin.Resource(steward.ResourceKind{...})` again with its own inputs,
+To add a kind of resource, call `plugin.Resource("kind", steward.ResourceOptions{...})` again with its own inputs,
 outputs and handlers.
 
 See the [SDK README](https://github.com/treno-dev/steward/blob/main/sdk/plugin/go/README.md) for

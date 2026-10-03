@@ -29,8 +29,7 @@ the credentials for each as inputs.
 ```go
 plugin := steward.New(steward.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
 
-plugin.Resource(steward.ResourceKind{
-	Kind:        "repository",
+plugin.Resource("repository", steward.ResourceOptions{
 	Provision:   provision,
 	Deprovision: deprovision,
 })
@@ -50,9 +49,10 @@ plugin.Serve()
 | `Validate` | Checks the inputs and credentials. Returns `ValidationError`s the user can fix. |
 | `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the integration as a whole, such as membership of an organization. |
 
-**A resource**, with `plugin.Resource(steward.ResourceKind{...})`, and **an application**, with
-`plugin.Application(steward.ApplicationKind{...})`, both have a `Kind` that is unique within the plugin,
-a `Title`, a `Description`, `Inputs` and `Outputs`. Resources also take `Roles` and `Permissions`.
+**A resource**, with `plugin.Resource("kind", steward.ResourceOptions{...})`, and **an application**,
+with `plugin.Application("kind", steward.ApplicationOptions{...})`, are each declared under a kind that
+is unique within the plugin, such as `"repository"`, and take a `Title`, a `Description`, `Inputs` and
+`Outputs`. Resources also take `Roles` and `Permissions`.
 Applications take `Sources` (`"git"`, `"image"`).
 
 **Inputs and outputs** are declared like variables:
@@ -71,7 +71,7 @@ Access exists at two levels, each with the same three handlers, `GrantAccess`, `
 
 - **The integration**, in `steward.Options`: membership of the tool as a whole, such as an organization
   or a site. Steward grants this first, then access to the resources.
-- **A resource kind**, in `steward.ResourceKind`: a role on one resource, such as a repository.
+- **A resource kind**, in `steward.ResourceOptions`: a role on one resource, such as a repository.
 
 What you declare with `Roles` (and, for tools that expose them, `Permissions`) is what Steward offers
 for assignment. A role has a `Name` and the `Permissions` it contains, and a permission is a `Name`
@@ -110,10 +110,14 @@ generated contract messages, re-exported by the package so a plugin imports one 
 
 - **Getters are nil-safe.** Use `request.GetIntegration().GetSecrets()["token"]`: anything the runner
   did not send reads as empty.
-- **Inputs.** `Integration.Inputs` and `Inputs` hold the values that are not sensitive, as a
-  `*structpb.Struct` (`.AsMap()` for a plain map; numbers arrive as `float64`). Sensitive values arrive
-  in `Integration.Secrets` (and a resource's or application's `Secrets`) as a `map[string]string`.
-  Never store them. Build a response `Struct`, such as `Outputs`, with `structpb.NewStruct`.
+- **Inputs.** `Integration.Inputs` and `Inputs` hold the values that are not sensitive; call `.AsMap()`
+  on one for a plain `map[string]any` (numbers arrive as `float64`). Sensitive values arrive in
+  `Integration.Secrets` (and a resource's or application's `Secrets`) as a `map[string]string`. Never
+  store them.
+- **Open-ended values in a response**, such as `Outputs`, are built with `steward.Struct(map[string]any{...})`,
+  and an input's `Default` with `steward.Value(...)`. They take what JSON can hold; anything else
+  panics, which the SDK reports as an `INTERNAL` error with the stack on stderr, as it does for any
+  panic in a handler.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating what
   exists, or removing what is gone, simply succeeds. Return the result of the change (the `Outputs`, the
   applied `Role`), not a description of what changed: Steward keeps the state and works out the

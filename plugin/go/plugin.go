@@ -2,7 +2,7 @@
 // see ../../proto) and the functions a plugin writes.
 //
 //	plugin := steward.New(steward.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
-//	plugin.Resource(steward.ResourceKind{Kind: "repository", Provision: provision, Deprovision: deprovision})
+//	plugin.Resource("repository", steward.ResourceOptions{Provision: provision, Deprovision: deprovision})
 //	plugin.Serve()
 //
 // A plugin is one integration, like a provider. It declares that integration and each of its resource
@@ -50,11 +50,9 @@ type Options struct {
 	GetAccess    func(context.Context, *IntegrationGetAccessRequest) (*IntegrationGetAccessResponse, error)
 }
 
-// ResourceKind declares a kind of resource the integration manages, with its handlers. A call for
-// something without a handler fails with UNIMPLEMENTED.
-type ResourceKind struct {
-	// Kind is unique within the plugin, such as "repository".
-	Kind        string
+// ResourceOptions describe a kind of resource the integration manages, with its handlers. A call
+// for something without a handler fails with UNIMPLEMENTED.
+type ResourceOptions struct {
 	Title       string
 	Description string
 
@@ -75,10 +73,8 @@ type ResourceKind struct {
 	GetAccess    func(context.Context, *ResourceGetAccessRequest) (*ResourceGetAccessResponse, error)
 }
 
-// ApplicationKind declares a kind of application the integration runs, with its handlers.
-type ApplicationKind struct {
-	// Kind is unique within the plugin, such as "laravel".
-	Kind        string
+// ApplicationOptions describe a kind of application the integration runs, with its handlers.
+type ApplicationOptions struct {
 	Title       string
 	Description string
 
@@ -98,8 +94,8 @@ type ApplicationKind struct {
 // Plugin is one integration. Declare its resources and applications, then call Serve.
 type Plugin struct {
 	options      Options
-	resources    map[string]ResourceKind
-	applications map[string]ApplicationKind
+	resources    map[string]ResourceOptions
+	applications map[string]ApplicationOptions
 
 	// Declaration order, so the description lists kinds the way the plugin declared them.
 	resourceOrder    []string
@@ -110,29 +106,31 @@ type Plugin struct {
 func New(options Options) *Plugin {
 	return &Plugin{
 		options:      options,
-		resources:    map[string]ResourceKind{},
-		applications: map[string]ApplicationKind{},
+		resources:    map[string]ResourceOptions{},
+		applications: map[string]ApplicationOptions{},
 	}
 }
 
-// Resource declares a kind of resource the integration manages.
-func (p *Plugin) Resource(kind ResourceKind) *Plugin {
-	if _, declared := p.resources[kind.Kind]; !declared {
-		p.resourceOrder = append(p.resourceOrder, kind.Kind)
+// Resource declares a kind of resource the integration manages. The kind is unique within the
+// plugin, such as "repository".
+func (p *Plugin) Resource(kind string, options ResourceOptions) *Plugin {
+	if _, declared := p.resources[kind]; !declared {
+		p.resourceOrder = append(p.resourceOrder, kind)
 	}
 
-	p.resources[kind.Kind] = kind
+	p.resources[kind] = options
 
 	return p
 }
 
-// Application declares a kind of application the integration runs.
-func (p *Plugin) Application(kind ApplicationKind) *Plugin {
-	if _, declared := p.applications[kind.Kind]; !declared {
-		p.applicationOrder = append(p.applicationOrder, kind.Kind)
+// Application declares a kind of application the integration runs. The kind is unique within the
+// plugin, such as "laravel".
+func (p *Plugin) Application(kind string, options ApplicationOptions) *Plugin {
+	if _, declared := p.applications[kind]; !declared {
+		p.applicationOrder = append(p.applicationOrder, kind)
 	}
 
-	p.applications[kind.Kind] = kind
+	p.applications[kind] = options
 
 	return p
 }
@@ -158,52 +156,52 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 	}
 
 	for _, name := range p.resourceOrder {
-		integration.Resources = append(integration.Resources, resourceDefinition(p.resources[name]))
+		integration.Resources = append(integration.Resources, resourceDefinition(name, p.resources[name]))
 	}
 
 	for _, name := range p.applicationOrder {
-		kind := p.applications[name]
+		options := p.applications[name]
 		integration.Applications = append(integration.Applications, &pluginv1.ApplicationDefinition{
-			Kind:        kind.Kind,
-			Title:       kind.Title,
-			Description: kind.Description,
-			Inputs:      kind.Inputs,
-			Sources:     kind.Sources,
-			Outputs:     kind.Outputs,
+			Kind:        name,
+			Title:       options.Title,
+			Description: options.Description,
+			Inputs:      options.Inputs,
+			Sources:     options.Sources,
+			Outputs:     options.Outputs,
 		})
 	}
 
 	return &pluginv1.DescribeResponse{Name: o.Name, Version: o.Version, Integration: integration}
 }
 
-func resourceDefinition(kind ResourceKind) *pluginv1.ResourceDefinition {
+func resourceDefinition(kind string, options ResourceOptions) *pluginv1.ResourceDefinition {
 	var capabilities []pluginv1.ResourceCapability
 
-	if kind.GrantAccess != nil || kind.RevokeAccess != nil || kind.GetAccess != nil {
+	if options.GrantAccess != nil || options.RevokeAccess != nil || options.GetAccess != nil {
 		capabilities = append(capabilities, pluginv1.ResourceCapability_RESOURCE_CAPABILITY_ACCESS)
 	}
 
-	if kind.Provision != nil || kind.Deprovision != nil {
+	if options.Provision != nil || options.Deprovision != nil {
 		capabilities = append(capabilities, pluginv1.ResourceCapability_RESOURCE_CAPABILITY_PROVISIONING)
 	}
 
-	if kind.List != nil {
+	if options.List != nil {
 		capabilities = append(capabilities, pluginv1.ResourceCapability_RESOURCE_CAPABILITY_DISCOVERY)
 	}
 
 	return &pluginv1.ResourceDefinition{
-		Kind:         kind.Kind,
-		Title:        kind.Title,
-		Description:  kind.Description,
-		Inputs:       kind.Inputs,
+		Kind:         kind,
+		Title:        options.Title,
+		Description:  options.Description,
+		Inputs:       options.Inputs,
 		Capabilities: capabilities,
-		Permissions:  kind.Permissions,
-		Roles:        kind.Roles,
-		Outputs:      kind.Outputs,
+		Permissions:  options.Permissions,
+		Roles:        options.Roles,
+		Outputs:      options.Outputs,
 	}
 }
 
-func (p *Plugin) resource(kind string) (ResourceKind, error) {
+func (p *Plugin) resource(kind string) (ResourceOptions, error) {
 	found, ok := p.resources[kind]
 	if !ok {
 		return found, status.Error(codes.NotFound, fmt.Sprintf("this plugin has no resource %q", kind))
@@ -212,7 +210,7 @@ func (p *Plugin) resource(kind string) (ResourceKind, error) {
 	return found, nil
 }
 
-func (p *Plugin) application(kind string) (ApplicationKind, error) {
+func (p *Plugin) application(kind string) (ApplicationOptions, error) {
 	found, ok := p.applications[kind]
 	if !ok {
 		return found, status.Error(codes.NotFound, fmt.Sprintf("this plugin has no application %q", kind))
