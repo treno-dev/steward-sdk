@@ -3,31 +3,99 @@
 Everything you need to write a Steward plugin: the contract, SDKs for Go, JavaScript, TypeScript and
 Python, and the templates `steward plugin init` starts a project from.
 
-## What a plugin is, and why
+## Steward, and the systems it manages
 
-Steward manages who has access to what: it decides that someone should get a role on a repository,
-a project or a cloud account, for how long, and who must approve it. But every tool does that
-differently. GitHub has organizations, teams and repository roles. AWS has accounts, IAM users and
-policies. Jira has sites, projects and groups. Creating a repository or giving someone a role means
-calling that tool's own API, in its own terms.
+Steward gives a company one standard way to manage everything its teams use across many systems. It
+covers three things, and treats them all the same way:
 
-A **plugin** is the piece that knows one tool. It connects Steward to it, the way a provider does in
-Terraform. It says what it needs to connect (a URL, a token), what it can manage there (repositories,
-buckets, projects) and what can be granted on those (roles, permissions), and it carries out the calls
-Steward makes: create this, remove that, give this person that role. Steward decides what should
-happen and keeps the state. The plugin only does it.
+- **Access:** who can use what, and with which role. Give Amina write access to the payments
+  repositories for a week; remove everything she holds when she leaves.
+- **Resources:** provisioning and deprovisioning the things teams work with. Create a repository, a
+  storage bucket or a database for a new project; remove them when the project ends.
+- **Applications:** creating, deploying and deleting the things teams run, with their settings and
+  secrets. Deploy this web app from that branch with these environment variables.
 
-Plugins exist for three reasons:
+Instead of an admin clicking through a dozen consoles, each with its own way of doing these things,
+people ask Steward. Steward records who asked, routes the request for approval, carries it out, keeps
+track of what now exists, and undoes it when it expires or is no longer needed.
 
-- **Steward cannot know every tool.** There are far too many for one team to build, and each changes
-  its API on its own schedule. A small, stable contract lets anyone add a tool, and lets the community
-  do it, without changes to Steward.
-- **Steward should not run other people's code.** Plugins are programs written by whoever needs them,
-  sometimes privately inside a company. They run in a runner that the person using them operates in
-  their own environment, next to the tools and credentials involved, and not on Steward's servers.
-- **Every tool must look the same to Steward.** Whatever the tool, Steward asks the same questions and
-  gets the same kinds of answers, so approvals, expiry, audit history and the interface work identically
-  for all of them.
+None of that work happens inside Steward. It happens in the **external systems** the company already
+uses: GitHub, AWS, Google Cloud, Jira, Cloudflare, a database server, an internal admin panel. Each of
+these has its own vocabulary and its own API:
+
+| System | Resources it provisions | Applications it runs | Access it grants |
+|---|---|---|---|
+| GitHub | repositories, teams | | `read`, `write`, `admin` on a repository |
+| AWS | buckets, databases, accounts | containers, functions | policies made of actions such as `s3:GetObject` |
+| A hosting platform | sites, databases | web apps deployed from git | team membership |
+| Jira | projects | | project roles such as `Developer` |
+
+Steward needs to do the same few things in all of them: create things, remove things, deploy things,
+let someone in, change what they can do, take it away. But "create a bucket" or "give Amina write
+access" means a completely different API call in each system.
+
+## What a plugin is
+
+A **plugin** is a small program that teaches Steward one external system. It is the translator between
+Steward's questions and that system's API. The GitHub plugin, for example:
+
+- **declares what it needs to connect:** the GitHub organization and an access token. Steward shows
+  these as a form when someone connects GitHub, and calls each connection an **integration**. A
+  company can have several integrations from one plugin, such as two GitHub organizations.
+- **declares what it manages:** kinds of **resources**, such as `repository`, each with the settings it
+  takes to create one (visibility, description) and what it reports back once it exists (its URL).
+- **declares what can be granted:** the roles and permissions GitHub offers, such as `read`, `write`
+  and `admin` on a repository.
+- **carries out Steward's calls:** create the repository `payments-api`, give `amina` the role `write`
+  on it, take it away again, tell me what `amina` holds right now.
+
+Those calls fall into three kinds of work. A plugin supports whichever fit its system:
+
+- **Resource provisioning:** create and remove resources, and report what they produced, such as a URL
+  or an id. Optionally, list resources that already exist so they can be brought under Steward.
+- **Application management:** create, deploy and delete applications, which are run from a source
+  (a git repository or an image) and have variables, such as a web app and its environment.
+- **Access:** grant, revoke and report someone's roles, on the system as a whole (membership of the
+  GitHub organization) or on one resource (a role on one repository).
+
+The plugin declares which of these it supports, for the system as a whole and for each kind of
+resource, and Steward offers only that. The list is designed to grow: new kinds of work are added to
+the contract beside these without breaking plugins that already exist.
+
+### Everything is extensible through plugins
+
+Steward has no built-in list of systems, resources or applications. Everything it can create, deploy
+or grant comes from a plugin, so anything a program can do, Steward can manage:
+
+- **Bring your existing infrastructure as code.** A plugin does not have to call a system's API
+  directly. Its `provision` can run the infrastructure-as-code, templates or scripts your team already
+  maintains, and return their outputs. The code stays yours; Steward puts requests, approvals,
+  ownership, expiry and an audit trail around it.
+- **Define your own kinds of resources.** A kind is whatever makes sense to your teams: not only "a
+  bucket", but "a production-ready service" that creates a repository, a database and a pipeline
+  together, with the inputs your platform team chooses to expose.
+- **Wrap internal systems.** An admin panel, a homegrown deployment tool or a legacy database can get
+  a plugin like any public service, and is then managed the same way as GitHub or AWS.
+- **Keep it private.** A plugin can live in your own repository and run only in your own runners. It
+  never has to be published.
+
+The plugin never decides anything. Steward decides what should exist and who should have what, keeps
+the record of it, and works out what changed. The plugin is told what to do, does it, and reports the result.
+
+## Why plugins
+
+- **No single team can cover every system.** There are thousands, each with its own API, and each
+  changes on its own schedule. A small, stable contract lets anyone add one, whether that is us, the
+  community, or a company writing a private plugin for its own internal system, without any change to
+  Steward.
+- **Steward does not run other people's code, and does not hold their credentials.** A plugin runs in a
+  **runner**, a process the company operates in its own environment, next to the systems and secrets it
+  needs. Steward sends work to the runner; the runner starts the plugin, passes it the credentials for
+  that one call, and sends back the result.
+- **Every system looks the same to Steward.** Whatever the plugin talks to, Steward asks the same
+  questions and gets the same kinds of answers. That is what lets approvals, time-limited access,
+  offboarding, audit history and the interface work identically for GitHub, AWS, or a system Steward
+  has never heard of.
 
 ## How it works
 
