@@ -1,0 +1,26 @@
+# [[.Title]]
+
+A Steward plugin for [[.Title]], built with the [Go SDK](https://github.com/treno-dev/steward/tree/main/sdk/plugin/go).
+
+## Run
+
+```sh
+go mod tidy
+go run .
+```
+
+Steward starts the plugin itself and talks to it over gRPC. Running it by hand prints the handshake
+line the runner reads, and nothing else on standard output. Write logs to stderr.
+
+## Where things are
+
+`main.go` declares the integration (what it needs to connect), each kind of resource and the handlers
+Steward calls: `Provision`, `Deprovision`, `GrantAccess`, `RevokeAccess` and `GetAccess`. Handlers take
+and return the typed messages of the contract. Leave out the handlers you do not need: Steward offers
+only what you implement.
+
+To add a kind of resource, call `plugin.Resource(steward.ResourceKind{...})` again with its own inputs,
+outputs and handlers.
+
+See the [SDK README](https://github.com/treno-dev/steward/blob/main/sdk/plugin/go/README.md) for
+everything a plugin can declare.

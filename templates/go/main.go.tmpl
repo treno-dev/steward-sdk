@@ -1,0 +1,121 @@
+// This is the file you edit. It declares what your plugin offers and implements the calls Steward
+// makes. The gRPC plumbing, the handshake and the health check live in the SDK.
+//
+// A plugin is one integration, like a provider. Declare it and each kind of resource once, with
+// its handlers attached: Steward's forms and the capabilities of each kind (provisioning,
+// discovery, access) follow from what you write here, and every call is routed to the right
+// handler by kind. If your plugin needs more than one tool, take the credentials for each as inputs.
+//
+// Handlers take the request and return the response, both typed from the contract and named for the
+// entity and the call (ResourceProvisionRequest, ResourceProvisionResponse). Request getters are safe
+// on anything the runner did not send. Fail a call with a gRPC status, such as
+// status.Error(codes.NotFound, "..."); any other error is reported as INTERNAL.
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"google.golang.org/protobuf/types/known/structpb"
+
+	steward "github.com/treno-dev/steward/sdk/plugin/go"
+)
+
+// Check that the inputs and credentials work. Return an error per input the user can fix.
+func validate(ctx context.Context, request *steward.IntegrationValidateRequest) (*steward.IntegrationValidateResponse, error) {
+	response := &steward.IntegrationValidateResponse{}
+
+	if request.GetIntegration().GetSecrets()["token"] == "" {
+		response.Errors = append(response.Errors, &steward.ValidationError{
+			Field:   "token",
+			Message: "An API token is required.",
+		})
+	}
+
+	return response, nil
+}
+
+// Create a resource called request.Name. Idempotent: if it already exists, succeed anyway. Return
+// what it produced, as declared in Outputs. The request also has the Integration and the Inputs.
+func provision(ctx context.Context, request *steward.ResourceProvisionRequest) (*steward.ResourceProvisionResponse, error) {
+	baseURL := request.GetIntegration().GetInputs().AsMap()["base_url"]
+
+	outputs, err := structpb.NewStruct(map[string]any{
+		"url": fmt.Sprintf("%v/items/%s", baseURL, request.GetName()),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &steward.ResourceProvisionResponse{Outputs: outputs}, nil
+}
+
+// Remove a resource. Idempotent: succeed if it is already gone. The request has the Integration and
+// the Resource (Kind, Name).
+func deprovision(ctx context.Context, request *steward.ResourceDeprovisionRequest) (*steward.ResourceDeprovisionResponse, error) {
+	return &steward.ResourceDeprovisionResponse{}, nil
+}
+
+// Give an identity a role on the resource. Idempotent. Return the role as the tool applied it, an
+// Id for the grant if the tool has one, and Pending if the person has to act first, such as
+// accepting an invitation. The request has the Integration, Resource, Identity (ExternalId, Name,
+// Attrs) and Role.
+func grantAccess(ctx context.Context, request *steward.ResourceGrantAccessRequest) (*steward.ResourceGrantAccessResponse, error) {
+	return &steward.ResourceGrantAccessResponse{Role: request.GetRole()}, nil
+}
+
+// Take a role away. Idempotent: succeed if the identity does not have it.
+func revokeAccess(ctx context.Context, request *steward.ResourceRevokeAccessRequest) (*steward.ResourceRevokeAccessResponse, error) {
+	return &steward.ResourceRevokeAccessResponse{}, nil
+}
+
+// Report the roles the identity holds on the resource now, and whether a grant is still pending.
+func getAccess(ctx context.Context, request *steward.ResourceGetAccessRequest) (*steward.ResourceGetAccessResponse, error) {
+	return &steward.ResourceGetAccessResponse{}, nil
+}
+
+func main() {
+	// The integration is one connection to the tool. Steward builds its form from Inputs, so it is
+	// also the documentation people see. Mark credentials Sensitive: they arrive in
+	// request.Integration.Secrets, the other inputs in request.Integration.Inputs.
+	plugin := steward.New(steward.Options{
+		Name:        "[[.Name]]",
+		Version:     "0.1.0",
+		Title:       "[[.Title]]",
+		Description: "Connects Steward to [[.Title]].",
+
+		// What is required to create an integration from this plugin.
+		Inputs: []*steward.InputDefinition{
+			{Name: "base_url", Label: "Base URL", Type: steward.TypeString, Required: true},
+			{Name: "token", Label: "API token", Type: steward.TypeString, Required: true, Sensitive: true},
+		},
+
+		Validate: validate,
+	})
+
+	// A kind of resource this integration manages.
+	plugin.Resource(steward.ResourceKind{
+		Kind:        "item",
+		Title:       "Item",
+		Description: "An example resource.",
+
+		// What a resource of this kind takes besides its name, which Steward stores with the kind.
+		Inputs:  []*steward.InputDefinition{{Name: "description", Label: "Description", Type: steward.TypeString}},
+		Outputs: []*steward.OutputDefinition{{Name: "url", Label: "URL", Type: steward.TypeString}},
+
+		// What can be granted on this kind: the tool's roles, and the permissions each contains.
+		// Writing the three access handlers is what makes the kind accept access.
+		Roles: []*steward.RoleDefinition{
+			{Name: "read", Title: "Read", Permissions: []*steward.Permission{{Name: "view"}}},
+			{Name: "write", Title: "Write", Permissions: []*steward.Permission{{Name: "view"}, {Name: "edit"}}},
+		},
+
+		Provision:    provision,
+		Deprovision:  deprovision,
+		GrantAccess:  grantAccess,
+		RevokeAccess: revokeAccess,
+		GetAccess:    getAccess,
+	})
+
+	plugin.Serve()
+}
