@@ -81,15 +81,25 @@ message Application {
   repeated Variable variables = 7;
 }
 
-// Where an application is deployed from.
+// Where an application is deployed from. The source types are a fixed set that Steward defines, each
+// with its own configuration, so every plugin sees the same shapes:
+//
+//   github    { owner, name, branch? }    a GitHub repository
+//   registry  { image, tag? }             a container image in a registry
+//   s3        { bucket, key }             an archive in an S3 bucket
+//   raw       { path }                    a path that is already there
 message ApplicationSource {
-  // One of ApplicationDefinition.sources: "git" or "image".
+  // One of ApplicationDefinition.sources.
   string type = 1;
 
-  // The repository URL, or the image name.
-  string location = 2;
+  reserved 2;
+  reserved "location";
 
-  // The branch, tag or commit, or the image tag or digest.
+  // The configuration of that type, as listed above.
+  google.protobuf.Struct config = 4;
+
+  // Pins an exact version: a commit, an image digest or an S3 object version id. Empty means the
+  // newest of what the config names, such as its branch, tag or key.
   string ref = 3;
 }
 
@@ -287,7 +297,8 @@ message ApplicationDefinition {
   // Fixed settings of the application itself, such as a runtime or a region. Not its variables.
   repeated InputDefinition inputs = 4;
 
-  // What it can be deployed from: "git" or "image".
+  // The source types it can be deployed from, by name: "github", "registry", "s3" or "raw", as
+  // described on ApplicationSource.
   repeated string sources = 5;
 
   // What it produces, such as its URL.
