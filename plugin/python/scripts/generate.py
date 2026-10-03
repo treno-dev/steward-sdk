@@ -1,38 +1,20 @@
-"""Generates the contract's Python messages and gRPC services into src/steward_plugin/_gen.
+"""Generates the contract's Python messages and gRPC services into src/steward_plugin/_gen, with buf.
 
 The generated code is not committed. Run it before building or testing the package:
 
     python scripts/generate.py
 """
 
-import shutil
+import subprocess
 import sys
-from importlib.resources import files
 from pathlib import Path
 
-from grpc_tools import protoc
-
 ROOT = Path(__file__).resolve().parents[1]
-PROTO = ROOT.parents[1] / "proto"
 OUT = ROOT / "src" / "steward_plugin" / "_gen"
-CONTRACT = "steward/plugin/v1/plugin.proto"
 
 
 def main() -> int:
-    shutil.rmtree(OUT, ignore_errors=True)
-    OUT.mkdir(parents=True)
-
-    status = protoc.main(
-        [
-            "protoc",
-            f"-I{PROTO}",
-            f"-I{files('grpc_tools') / '_proto'}",
-            f"--python_out={OUT}",
-            f"--pyi_out={OUT}",
-            f"--grpc_python_out={OUT}",
-            CONTRACT,
-        ]
-    )
+    status = subprocess.run(["buf", "generate"], cwd=ROOT).returncode
 
     if status != 0:
         return status
@@ -41,7 +23,7 @@ def main() -> int:
         if folder.is_dir():
             (folder / "__init__.py").touch()
 
-    # protoc imports its own output by the proto path; the package keeps it under _gen instead.
+    # The plugin imports its own output by the proto path; the package keeps it under _gen instead.
     grpc_module = OUT / "steward" / "plugin" / "v1" / "plugin_pb2_grpc.py"
     source = grpc_module.read_text()
     grpc_module.write_text(

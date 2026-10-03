@@ -282,8 +282,9 @@ handshake line the runner reads.
 
 ## Developing the SDK
 
-The messages and gRPC services are generated from `../../proto` with `grpcio-tools`, and the generated
-code is not committed.
+The messages and gRPC services are generated from `../../proto` with `buf` (`buf.gen.yaml`, using
+buf's remote plugins, so it needs network access), and the generated code is not committed. The plugin
+versions in `buf.gen.yaml` decide the minimum `protobuf` and `grpcio` the package requires.
 
 ```sh
 python -m venv .venv && source .venv/bin/activate

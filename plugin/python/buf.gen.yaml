@@ -1,0 +1,11 @@
+version: v2
+inputs:
+  - directory: ../../proto
+clean: true
+plugins:
+  - remote: buf.build/protocolbuffers/python:v29.3
+    out: src/steward_plugin/_gen
+  - remote: buf.build/protocolbuffers/pyi:v29.3
+    out: src/steward_plugin/_gen
+  - remote: buf.build/grpc/python:v1.69.0
+    out: src/steward_plugin/_gen
