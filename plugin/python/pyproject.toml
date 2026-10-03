@@ -9,9 +9,9 @@ description = "The Python SDK for writing Steward plugins"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "grpcio>=1.69.0",
-  "grpcio-health-checking>=1.69.0",
-  "protobuf>=5.29.3",
+  "grpcio>=1.84.0",
+  "grpcio-health-checking>=1.84.0",
+  "protobuf>=7.36.2",
 ]
 
 [project.optional-dependencies]
