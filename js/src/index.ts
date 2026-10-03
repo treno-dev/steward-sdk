@@ -1,16 +1,16 @@
 // The Steward plugin SDK for JavaScript: the plumbing between the plugin contract (gRPC, see
 // ../proto) and the plain objects a plugin works with.
 //
-//   const plugin = createPlugin({ name: 'github', version: '0.1.0' });
-//   const github = plugin.integration({ kind: 'github', inputs: [...], validate });
-//   github.resource({ kind: 'repository', inputs: [...], provision, deprovision, list });
+//   const plugin = createPlugin({ name: 'github', version: '0.1.0', inputs: [...], validate });
+//   plugin.resource({ kind: 'repository', inputs: [...], provision, deprovision, list });
 //   plugin.serve();
 //
-// A plugin declares each integration and each resource or application kind once, with its handlers
-// attached. The SDK routes every call to the right handler by kind, builds the description Steward
-// asks for (including each kind's capabilities, which follow from the handlers it has), serves the
-// gRPC services, prints the handshake line, answers the health check, fills in whatever a handler
-// leaves out of its response, and answers any call without a handler with UNIMPLEMENTED.
+// A plugin is one integration, like a provider. It declares that integration and each of its
+// resource or application kinds once, with the handlers attached. The SDK routes every call to the
+// right handler by kind, builds the description Steward asks for (including each kind's
+// capabilities, which follow from the handlers it has), serves the gRPC services, prints the
+// handshake line, answers the health check, fills in whatever a handler leaves out of its response,
+// and answers any call without a handler with UNIMPLEMENTED.
 //
 // Everything a plugin logs must go to stderr: stdout is reserved for the handshake line.
 //
@@ -64,9 +64,12 @@ type Access = {
   roles?: DeepPartial<RoleDefinition>[];
 };
 
-export type IntegrationOptions = Describe &
+// The plugin and its integration: what is needed to create an integration from it, and, when the
+// integration supports access as a whole, the handlers for that.
+export type PluginOptions = Describe &
   Access & {
-    kind: string;
+    name: string;
+    version: string;
     validate?: Handlers<typeof contract.PluginServiceService>['validate'];
   } & Handlers<typeof contract.IntegrationServiceService>;
 
@@ -82,9 +85,8 @@ export type ApplicationOptions = Describe & {
   outputs?: DeepPartial<OutputDefinition>[];
 } & Handlers<typeof contract.ApplicationServiceService>;
 
-// A request carries the integration it is for, and the kind or the thing it is about.
+// A request carries the kind or the thing it is about.
 type AnyRequest = {
-  integration?: { kind: string };
   kind?: string;
   resource?: { kind: string };
   application?: { kind: string };
@@ -101,44 +103,6 @@ function has(options: object, calls: readonly string[]): boolean {
 
 function fail(code: grpc.status, message: string): never {
   throw { code, message };
-}
-
-class Integration {
-  readonly resources = new Map<string, ResourceOptions>();
-  readonly applications = new Map<string, ApplicationOptions>();
-
-  constructor(readonly options: IntegrationOptions) {}
-
-  /** Declares a kind of resource this integration manages, with its handlers. */
-  resource(options: ResourceOptions): this {
-    this.resources.set(options.kind, options);
-
-    return this;
-  }
-
-  /** Declares a kind of application this integration runs, with its handlers. */
-  application(options: ApplicationOptions): this {
-    this.applications.set(options.kind, options);
-
-    return this;
-  }
-
-  definition(): DeepPartial<IntegrationDefinition> {
-    const { kind, title, description, inputs, permissions, roles } = this.options;
-    const access = has(this.options, ACCESS_CALLS);
-
-    return {
-      kind,
-      title,
-      description,
-      inputs,
-      permissions,
-      roles,
-      capabilities: access ? [contract.IntegrationCapability.INTEGRATION_CAPABILITY_ACCESS] : [],
-      resources: [...this.resources.values()].map(resourceDefinition),
-      applications: [...this.applications.values()].map(applicationDefinition),
-    };
-  }
 }
 
 function resourceDefinition(options: ResourceOptions): DeepPartial<ResourceDefinition> {
@@ -167,20 +131,23 @@ function applicationDefinition(options: ApplicationOptions): DeepPartial<Applica
 }
 
 export class Plugin {
-  readonly integrations = new Map<string, Integration>();
+  readonly resources = new Map<string, ResourceOptions>();
+  readonly applications = new Map<string, ApplicationOptions>();
 
-  constructor(
-    readonly name: string,
-    readonly version: string,
-  ) {}
+  constructor(readonly options: PluginOptions) {}
 
-  /** Declares an integration, the connection to one tool, and returns it to attach resources to. */
-  integration(options: IntegrationOptions): Integration {
-    const integration = new Integration(options);
+  /** Declares a kind of resource the integration manages, with its handlers. */
+  resource(options: ResourceOptions): this {
+    this.resources.set(options.kind, options);
 
-    this.integrations.set(options.kind, integration);
+    return this;
+  }
 
-    return integration;
+  /** Declares a kind of application the integration runs, with its handlers. */
+  application(options: ApplicationOptions): this {
+    this.applications.set(options.kind, options);
+
+    return this;
   }
 
   /** Starts serving the plugin. The runner stops it when it is done. */
@@ -189,20 +156,16 @@ export class Plugin {
   }
 
   describe() {
-    return {
-      name: this.name,
-      version: this.version,
-      integrations: [...this.integrations.values()].map((integration) => integration.definition()),
-    };
+    const { name, version } = this.options;
+
+    return { name, version, integration: this.integrationDefinition() };
   }
 
   // Routes a call to the handler of the same name on whatever the request is about: the
-  // integration, or one of its kinds of resource or application.
+  // integration itself, or one of its kinds of resource or application.
   route(call: string, target: Target, kindOf: (request: AnyRequest) => string = () => '') {
     return (request: AnyRequest) => {
-      const integration = this.forRequest(request);
-      const options =
-        target === 'integration' ? integration.options : this.kind(integration, target, kindOf(request));
+      const options = target === 'integration' ? this.options : this.kind(target, kindOf(request));
       const handler = (options as Record<string, unknown>)[call] as ((request: AnyRequest) => unknown) | undefined;
 
       return handler
@@ -211,23 +174,32 @@ export class Plugin {
     };
   }
 
-  // The integration a request is for, found by the kind it carries.
-  private forRequest(request: AnyRequest): Integration {
-    const kind = request.integration?.kind ?? '';
+  private integrationDefinition(): DeepPartial<IntegrationDefinition> {
+    const { title, description, inputs, permissions, roles } = this.options;
+    const access = has(this.options, ACCESS_CALLS);
 
-    return this.integrations.get(kind) ?? fail(grpc.status.NOT_FOUND, `this plugin has no integration "${kind}"`);
+    return {
+      title,
+      description,
+      inputs,
+      permissions,
+      roles,
+      capabilities: access ? [contract.IntegrationCapability.INTEGRATION_CAPABILITY_ACCESS] : [],
+      resources: [...this.resources.values()].map(resourceDefinition),
+      applications: [...this.applications.values()].map(applicationDefinition),
+    };
   }
 
-  private kind(integration: Integration, target: 'resource' | 'application', kind: string): object {
-    const kinds = target === 'resource' ? integration.resources : integration.applications;
+  private kind(target: 'resource' | 'application', kind: string): object {
+    const kinds = target === 'resource' ? this.resources : this.applications;
 
-    return kinds.get(kind) ?? fail(grpc.status.NOT_FOUND, `this integration has no ${target} "${kind}"`);
+    return kinds.get(kind) ?? fail(grpc.status.NOT_FOUND, `this plugin has no ${target} "${kind}"`);
   }
 }
 
-/** Creates a plugin. Declare its integrations, then call `serve()`. */
-export function createPlugin({ name, version }: { name: string; version: string }): Plugin {
-  return new Plugin(name, version);
+/** Creates a plugin, which is one integration. Declare its resources, then call `serve()`. */
+export function createPlugin(options: PluginOptions): Plugin {
+  return new Plugin(options);
 }
 
 // Serving --------------------------------------------------------------------------------------
@@ -299,10 +271,9 @@ function routes(plugin: Plugin, calls: readonly string[], target: Target, kindOf
 
 function serve(plugin: Plugin): void {
   const server = new grpc.Server();
-  const integrations = [...plugin.integrations.values()];
-  const anyResource = integrations.some((integration) => integration.resources.size > 0);
-  const anyApplication = integrations.some((integration) => integration.applications.size > 0);
-  const anyAccess = integrations.some((integration) => has(integration.options, ACCESS_CALLS));
+  const anyResource = plugin.resources.size > 0;
+  const anyApplication = plugin.applications.size > 0;
+  const anyAccess = has(plugin.options, ACCESS_CALLS);
 
   server.addService(contract.PluginServiceService, implement(contract.PluginServiceService, {
     describe: () => plugin.describe(),
