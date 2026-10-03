@@ -144,8 +144,13 @@ jobs:
           tar -czf out/templates.tar.gz -C "$stage" VERSION templates
           (cd out && sha256sum templates.tar.gz > templates.tar.gz.sha256)
 
-      - name: Create the release
+      - name: Create the release, or add the templates to the one that exists
         run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" out/templates.tar.gz out/templates.tar.gz.sha256 --clobber
+            exit 0
+          fi
+
           flags=""
 
           if [ "$PRERELEASE" = "true" ]; then
@@ -157,5 +162,10 @@ jobs:
 
       - name: Tag the Go module
         run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/go/$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "go/$GITHUB_REF_NAME already exists"
+            exit 0
+          fi
+
           git tag "go/$GITHUB_REF_NAME"
           git push origin "go/$GITHUB_REF_NAME"
