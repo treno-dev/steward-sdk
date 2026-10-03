@@ -1,0 +1,12 @@
+version: v2
+inputs:
+  - directory: ../proto
+plugins:
+  - local: node_modules/.bin/protoc-gen-ts_proto
+    out: src/gen
+    opt:
+      - env=node
+      - esModuleInterop=true
+      - importSuffix=.js
+      - outputServices=grpc-js
+      - stringEnums=true
