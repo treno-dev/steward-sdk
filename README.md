@@ -24,6 +24,26 @@ only does it.
    one function per call. The SDK serves gRPC, prints the handshake, answers the health check, routes
    each call to your function by kind, and answers anything you did not write with `UNIMPLEMENTED`.
 
+### Any language works
+
+The SDKs are a convenience, not a requirement. The runner speaks the protocol of
+[`hashicorp/go-plugin`](https://github.com/hashicorp/go-plugin) (a subprocess, a handshake line, gRPC),
+so a plugin can be written in any language that can serve gRPC. A program is a Steward plugin if it:
+
+1. **prints the handshake line** on stdout, `1|1|tcp|127.0.0.1:<port>|grpc`, once it is listening;
+2. **serves the services of the contract**: `PluginService` always, and `IntegrationService`,
+   `ResourceService` and `ApplicationService` for what it supports, generated from
+   [the proto](proto/steward/plugin/v1/plugin.proto) with `protoc` or `buf` in your language; and
+3. **serves the standard gRPC health service**, reporting `SERVING` for the service named `plugin`.
+
+That is the whole obligation. Nothing else is needed, and the plugin never has to import Steward code.
+
+What the SDK adds is what makes writing one easy: it does those three things for you, turns the
+`google.protobuf.Struct` values into plain objects, routes each call to your function by kind, builds
+the description from what you declared, fills in what a handler leaves out, and answers what you did
+not write with `UNIMPLEMENTED`. So the SDKs for JavaScript, TypeScript, Python and Go are the easy
+road, and a plugin in Rust, Java or anything else is the same contract without that help.
+
 ### The pieces of a plugin
 
 - **An integration**: one connection to the tool. It declares its **inputs**, like variables with a
