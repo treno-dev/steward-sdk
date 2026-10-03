@@ -1,0 +1,636 @@
+syntax = "proto3";
+
+package steward.plugin.v1;
+
+import "google/protobuf/struct.proto";
+
+// The plugin contract. Every plugin serves PluginService. A plugin that supports access to its
+// integrations as a whole also serves IntegrationService, and one that has resources serves
+// ResourceService, and one that runs applications serves ApplicationService. Which of those calls
+// apply to which integration or resource kind is declared in Describe through capabilities; a call
+// for a capability that was not declared fails with UNIMPLEMENTED. Within v1 the contract is
+// additive only.
+//
+// Calls that change state report whether they did anything in a `changed` field. Failures, such as
+// an unreachable tool or an invalid request, are returned as gRPC errors instead.
+//
+// The file has the messages first, then the services at the bottom.
+
+// ---------------------------------------------------------------------------------------------
+// Shared messages
+// ---------------------------------------------------------------------------------------------
+
+// The integration a call is for: its inputs, including the sensitive ones, needed to reach the
+// tool. A plugin must not persist the sensitive values.
+message Integration {
+  // Which of the plugin's integrations this is, as declared in DescribeResponse.integrations.
+  string kind = 1;
+
+  // Values for the inputs declared in IntegrationDefinition.inputs that are not sensitive, keyed
+  // by input name.
+  google.protobuf.Struct inputs = 2;
+
+  // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
+  // call only.
+  map<string, string> secrets = 3;
+}
+
+// Something in the tool that access can be granted to or that can be provisioned.
+message Resource {
+  // A kind declared in IntegrationDefinition.resources, for the integration the call is for.
+  string kind = 1;
+
+  // The resource's identity in the tool, such as a repository's full name.
+  string id = 2;
+
+  // Values for the inputs declared in ResourceDefinition.inputs that are not sensitive, keyed by
+  // input name.
+  google.protobuf.Struct inputs = 3;
+
+  // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
+  // call only, like Integration.secrets.
+  map<string, string> secrets = 4;
+
+  // Values the resource produced, as declared in ResourceDefinition.outputs, keyed by output name.
+  // Set by the plugin when it provisions or lists a resource; ignored on calls. Values of outputs
+  // declared sensitive stay with the runner and are not passed on to Steward.
+  google.protobuf.Struct outputs = 5;
+}
+
+// Something deployed and run in the tool, as opposed to a resource, which is provisioned.
+message Application {
+  // A kind declared in IntegrationDefinition.applications.
+  string kind = 1;
+
+  // The application's identity in the tool.
+  string id = 2;
+
+  // Values for the inputs declared in ApplicationDefinition.inputs, keyed by input name. Values of
+  // sensitive inputs go in `secrets`, as for a resource.
+  google.protobuf.Struct inputs = 3;
+  map<string, string> secrets = 4;
+
+  // Values the application produced, as declared in ApplicationDefinition.outputs.
+  google.protobuf.Struct outputs = 5;
+
+  // What it is deployed from.
+  ApplicationSource source = 6;
+
+  // Its variables. Open-ended: the names are not declared by the plugin.
+  repeated Variable variables = 7;
+}
+
+// Where an application is deployed from.
+message ApplicationSource {
+  // One of ApplicationDefinition.sources: "git" or "image".
+  string type = 1;
+
+  // The repository URL, or the image name.
+  string location = 2;
+
+  // The branch, tag or commit, or the image tag or digest.
+  string ref = 3;
+}
+
+// One variable of an application, such as an environment variable. Unlike an input, its name is
+// chosen by whoever sets it, and each variable carries its own protection.
+message Variable {
+  string name = 1;
+
+  // For a sensitive variable, resolved by the runner for this call only.
+  string value = 2;
+
+  // The value is a secret, such as a key or a token.
+  bool sensitive = 3;
+
+  // The value cannot be viewed once it is set.
+  bool sealed = 4;
+
+  // The variable cannot be edited or deleted once it is set, such as APP_KEY, where a change would
+  // break data the application has already encrypted.
+  bool locked = 5;
+}
+
+// Who a user is in the tool, such as a GitHub login or an AWS principal.
+//
+// Every field is optional, so an identity can be as complete as Steward knows it. A call that needs
+// more than it was given, such as a grant with neither an external_id nor an attr the tool can
+// invite by, fails with INVALID_ARGUMENT.
+message Identity {
+  // Steward's own opaque identifier for the identity. A plugin does not interpret it; it is there
+  // to correlate a call with what Steward recorded.
+  optional string ulid = 1;
+
+  // The identity in the tool, such as a GitHub login.
+  optional string external_id = 2;
+
+  // A display name, when known.
+  optional string name = 3;
+
+  // Anything else the tool may need, such as an email address for an invitation.
+  google.protobuf.Struct attrs = 4;
+}
+
+// A set of permissions, defined in Steward. A plugin uses whichever part fits the tool: the name
+// for a tool with named roles, or the permissions for one with fine-grained rights.
+message Role {
+  string name = 1;
+  repeated Permission permissions = 2;
+}
+
+// One permission, in whatever form the tool uses. The name is the permission itself, such as
+// "s3:GetObject", "DescribeStacks" or "pull_requests". The level qualifies it for tools whose
+// permissions come in degrees, such as "read" or "write", and is unset for those whose do not.
+// Steward does not interpret either; the plugin does.
+message Permission {
+  string name = 1;
+  optional string level = 2;
+
+  // What the permission allows, in words. Filled in when a plugin describes permissions, such as
+  // those inside a native role, and ignored on calls.
+  optional string description = 3;
+}
+
+// What a resource type can do. Generated code exposes these as named constants; the numbers are
+// only the wire format. Never renumber or reuse a value: a removed value is marked `reserved`, and
+// `buf breaking` fails any change that renumbers one.
+enum ResourceCapability {
+  RESOURCE_CAPABILITY_UNSPECIFIED = 0;
+  RESOURCE_CAPABILITY_ACCESS = 1;
+  RESOURCE_CAPABILITY_PROVISIONING = 2;
+  RESOURCE_CAPABILITY_DISCOVERY = 3;
+}
+
+// What an integration itself can do. Same rules as ResourceCapability.
+enum IntegrationCapability {
+  INTEGRATION_CAPABILITY_UNSPECIFIED = 0;
+
+  // People can be given access to the integration as a whole, such as membership of a GitHub
+  // organization, a user in a Jira site or an IAM user in an AWS account.
+  INTEGRATION_CAPABILITY_ACCESS = 1;
+}
+
+// ---------------------------------------------------------------------------------------------
+// PluginService messages
+// ---------------------------------------------------------------------------------------------
+
+message DescribeRequest {}
+
+message DescribeResponse {
+  string name = 1;
+  string version = 2;
+
+  // The integrations the plugin offers. Most plugins have one; a plugin that covers several tools,
+  // such as two cloud providers, has one for each.
+  repeated IntegrationDefinition integrations = 3;
+}
+
+message IntegrationDefinition {
+  // Unique within the plugin, such as "github".
+  string kind = 1;
+  string title = 2;
+  string description = 3;
+
+  // What is required to create an integration of this kind, credentials included: those are inputs
+  // marked sensitive.
+  repeated InputDefinition inputs = 4;
+
+  // The resource kinds this integration manages. Kinds are unique within an integration.
+  repeated ResourceDefinition resources = 5;
+
+  // What the integration itself can do.
+  repeated IntegrationCapability capabilities = 6;
+
+  // What can be granted on the integration as a whole. Only meaningful with
+  // INTEGRATION_CAPABILITY_ACCESS, and declared the same way as on a resource type: permissions,
+  // roles, or both.
+  repeated PermissionDefinition permissions = 7;
+  repeated RoleDefinition roles = 8;
+
+  // The application kinds this integration can run, such as a Laravel app on a host. Applications
+  // are a second kind of thing next to resources: they are deployed from a source and have
+  // variables that people edit over time. Kinds are unique within an integration. Empty when the
+  // integration runs no applications.
+  repeated ApplicationDefinition applications = 9;
+}
+
+// One value an integration or a resource takes, declared the way a variable is: a name and a type,
+// with the value passed separately. Values travel keyed by `name`: in Integration.inputs or
+// Resource.inputs, or, for sensitive inputs, in their `secrets` map.
+message InputDefinition {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+
+  // One of "string", "number", "boolean", "select", "list" (of strings) or "map" (string keys and
+  // values). The SDKs export these as constants, and `steward plugin validate` rejects any other.
+  string type = 4;
+
+  bool required = 5;
+
+  // Used when no value is given.
+  google.protobuf.Value default = 6;
+
+  // The choices for a "select".
+  repeated string options = 7;
+
+  // The value is a secret, such as a token or a private key. It is never shown back once set.
+  bool sensitive = 8;
+}
+
+// One value a resource produces, declared like an input: a name and a type. Same types as an input.
+message OutputDefinition {
+  string name = 1;
+  string label = 2;
+  string description = 3;
+  string type = 4;
+
+  // The value is a secret, such as a generated password. The plugin still returns it in
+  // Resource.outputs, but the runner writes it to the customer's own secret store and reports only
+  // a reference to Steward, which never sees or stores the value.
+  bool sensitive = 5;
+}
+
+message ResourceDefinition {
+  // Unique within the integration, such as "repository".
+  string kind = 1;
+  string title = 2;
+  string description = 3;
+
+  // What is required to create a resource of this kind, credentials included: those are inputs
+  // marked sensitive. Provision takes values for these.
+  repeated InputDefinition inputs = 4;
+
+  // The capabilities this type supports. They are independent of each other.
+  repeated ResourceCapability capabilities = 5;
+
+  // What can be granted on this type. Only meaningful with RESOURCE_CAPABILITY_ACCESS. A tool may
+  // expose permissions, roles, or both. When permissions are declared, Steward lets organizations
+  // build custom roles from them.
+  repeated PermissionDefinition permissions = 6;
+  repeated RoleDefinition roles = 7;
+
+  // What a resource of this kind produces, such as a URL or an ARN, known once it exists. The
+  // values come back in Resource.outputs.
+  repeated OutputDefinition outputs = 8;
+}
+
+// An application is deployable and has open-ended variables, which a resource has neither of. A
+// resource has fixed inputs and outputs that the plugin declares; an application also has a source
+// and variables whose names are chosen by the people who run it. Every declared application kind
+// can be deployed and has variables, so there is no capability list.
+message ApplicationDefinition {
+  // Unique within the integration, such as "laravel".
+  string kind = 1;
+  string title = 2;
+  string description = 3;
+
+  // Fixed settings of the application itself, such as a runtime or a region. Not its variables.
+  repeated InputDefinition inputs = 4;
+
+  // What it can be deployed from: "git" or "image".
+  repeated string sources = 5;
+
+  // What it produces, such as its URL.
+  repeated OutputDefinition outputs = 6;
+}
+
+message PermissionDefinition {
+  string name = 1;
+  string title = 2;
+  string description = 3;
+
+  // The levels the permission can be given at, such as "read" and "write". Empty for a permission
+  // that has none.
+  repeated string levels = 4;
+}
+
+// A role the tool defines itself. The permissions are those it contains, when the tool exposes
+// them; empty otherwise.
+message RoleDefinition {
+  string name = 1;
+  string title = 2;
+  string description = 3;
+  repeated Permission permissions = 4;
+}
+
+message ValidateRequest {
+  Integration integration = 1;
+}
+
+message ValidateResponse {
+  // Problems with the inputs or credentials that the user can fix. Empty when the integration
+  // is good. Failures of the call itself are returned as gRPC errors instead.
+  repeated ValidationError errors = 1;
+}
+
+message ValidationError {
+  // The input the error is about. Empty when it is about the integration as a
+  // whole.
+  string field = 1;
+  string message = 2;
+}
+
+// ---------------------------------------------------------------------------------------------
+// IntegrationService messages
+// ---------------------------------------------------------------------------------------------
+
+// Access to the integration as a whole, such as membership of a GitHub organization. Steward
+// grants it before it grants access to the integration's resources, and decides when to remove it.
+//
+// Idempotent: granting what is already granted succeeds with changed = false.
+message IntegrationServiceGrantAccessRequest {
+  Integration integration = 1;
+  Identity identity = 2;
+  Role role = 3;
+}
+
+message IntegrationServiceGrantAccessResponse {
+  // False when the identity already had the role.
+  bool changed = 1;
+
+  // The grant's own identity in the tool, such as a membership or invitation id. Empty when the
+  // tool has none. Steward records it and sends it back on revoke.
+  string id = 2;
+
+  // The role as the tool actually applied it. It can differ from the one requested: a custom role
+  // may land as a native role, or as only the permissions the tool supports.
+  Role role = 3;
+
+  // True when the grant needs the identity to act before it takes effect, such as accepting an
+  // invitation. The access is not in effect yet.
+  bool pending = 4;
+}
+
+// Idempotent: revoking what is already absent succeeds with changed = false. Steward works out
+// overlap between roles before it sends a revoke, so the role here is safe to remove in full.
+message IntegrationServiceRevokeAccessRequest {
+  Integration integration = 1;
+  Identity identity = 2;
+  Role role = 3;
+
+  // The id GrantAccess returned for this grant, when it returned one.
+  string id = 4;
+}
+
+message IntegrationServiceRevokeAccessResponse {
+  // False when the identity did not have the role.
+  bool changed = 1;
+}
+
+// Asks what an identity holds on the integration now, for example to skip an invitation to
+// someone who is already a member, or to find drift.
+message IntegrationServiceCheckAccessRequest {
+  Integration integration = 1;
+  Identity identity = 2;
+}
+
+message IntegrationServiceCheckAccessResponse {
+  // The roles the identity holds. Empty when it has none.
+  repeated Role roles = 1;
+
+  // True when an invitation or similar is outstanding and the access is not yet in effect.
+  bool pending = 2;
+
+  // The identity as the tool knows it, with whatever the tool could resolve, such as the
+  // external_id for someone who was found by email. Unset when no match was found.
+  Identity identity = 3;
+}
+
+// ---------------------------------------------------------------------------------------------
+// ResourceService messages
+// ---------------------------------------------------------------------------------------------
+
+// Access to one resource, such as a role on a repository. Steward grants it after the identity has
+// access to the integration.
+//
+// Idempotent: granting what is already granted succeeds with changed = false.
+message ResourceServiceGrantAccessRequest {
+  Integration integration = 1;
+  Resource resource = 2;
+  Identity identity = 3;
+  Role role = 4;
+}
+
+message ResourceServiceGrantAccessResponse {
+  // False when the identity already had the role.
+  bool changed = 1;
+
+  // The grant's own identity in the tool, such as an assignment or invitation id. Empty when the
+  // tool has none. Steward records it and sends it back on revoke.
+  string id = 2;
+
+  // The role as the tool actually applied it. It can differ from the one requested: a custom role
+  // may land as a native role, or as only the permissions the tool supports.
+  Role role = 3;
+
+  // True when the grant needs the identity to act before it takes effect, such as accepting an
+  // invitation. The access is not in effect yet.
+  bool pending = 4;
+}
+
+// Idempotent: revoking what is already absent succeeds with changed = false. Steward works out
+// overlap between roles before it sends a revoke, so the role here is safe to remove in full.
+message ResourceServiceRevokeAccessRequest {
+  Integration integration = 1;
+  Resource resource = 2;
+  Identity identity = 3;
+  Role role = 4;
+
+  // The id GrantAccess returned for this grant, when it returned one.
+  string id = 5;
+}
+
+message ResourceServiceRevokeAccessResponse {
+  // False when the identity did not have the role.
+  bool changed = 1;
+}
+
+// Asks what an identity holds on a resource now.
+message ResourceServiceCheckAccessRequest {
+  Integration integration = 1;
+  Resource resource = 2;
+  Identity identity = 3;
+}
+
+message ResourceServiceCheckAccessResponse {
+  // The roles the identity holds on the resource. Empty when it has none.
+  repeated Role roles = 1;
+
+  // True when an invitation or similar is outstanding and the access is not yet in effect.
+  bool pending = 2;
+}
+
+// Idempotent: provisioning something that already exists with the same identity returns it with
+// changed = false.
+message ResourceServiceProvisionRequest {
+  Integration integration = 1;
+
+  // The kind to create, as declared in IntegrationDefinition.resources.
+  string kind = 2;
+
+  // Its inputs, validated against the kind's schema. The id is chosen by the tool or derived from
+  // the inputs, and comes back in the response.
+  google.protobuf.Struct inputs = 3;
+
+  // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
+  // call only.
+  map<string, string> secrets = 4;
+}
+
+message ResourceServiceProvisionResponse {
+  // False when the resource already existed.
+  bool changed = 1;
+
+  // The resource as it now exists, with its identity in the tool.
+  Resource resource = 2;
+}
+
+// Idempotent: removing something that is already gone succeeds with changed = false.
+message ResourceServiceDeprovisionRequest {
+  Integration integration = 1;
+  Resource resource = 2;
+}
+
+message ResourceServiceDeprovisionResponse {
+  // False when the resource was already gone.
+  bool changed = 1;
+}
+
+message ResourceServiceListRequest {
+  Integration integration = 1;
+  string kind = 2;
+  string page_token = 3;
+}
+
+message ResourceServiceListResponse {
+  repeated Resource resources = 1;
+
+  // Empty on the last page.
+  string next_page_token = 2;
+}
+
+// ---------------------------------------------------------------------------------------------
+// ApplicationService messages
+// ---------------------------------------------------------------------------------------------
+
+// Idempotent: creating an application that already exists with the same identity returns it with
+// changed = false.
+message ApplicationServiceCreateRequest {
+  Integration integration = 1;
+
+  // A kind declared in IntegrationDefinition.applications, with its inputs and sensitive values,
+  // where it is deployed from, and its starting variables.
+  string kind = 2;
+  google.protobuf.Struct inputs = 3;
+  map<string, string> secrets = 4;
+  ApplicationSource source = 5;
+  repeated Variable variables = 6;
+}
+
+message ApplicationServiceCreateResponse {
+  // False when the application already existed.
+  bool changed = 1;
+
+  // The application as it now exists, with its identity in the tool.
+  Application application = 2;
+}
+
+// Idempotent: removing an application that is already gone succeeds with changed = false.
+message ApplicationServiceDeleteRequest {
+  Integration integration = 1;
+  Application application = 2;
+}
+
+message ApplicationServiceDeleteResponse {
+  // False when the application was already gone.
+  bool changed = 1;
+}
+
+// Deploys the application from a source, replacing what is running.
+message ApplicationServiceDeployRequest {
+  Integration integration = 1;
+  Application application = 2;
+
+  // What to deploy. Unset means redeploy from the application's current source.
+  ApplicationSource source = 3;
+}
+
+message ApplicationServiceDeployResponse {
+  // The application after the deploy was started, with its outputs.
+  Application application = 1;
+}
+
+// Changes an application's variables without touching the others.
+message ApplicationServiceSetVariablesRequest {
+  Integration integration = 1;
+  Application application = 2;
+
+  // Variables to add or change.
+  repeated Variable set = 3;
+
+  // Names of variables to remove. A locked variable cannot be changed or removed: the call fails
+  // with FAILED_PRECONDITION.
+  repeated string remove = 4;
+}
+
+message ApplicationServiceSetVariablesResponse {
+  // False when nothing differed from what was asked.
+  bool changed = 1;
+}
+
+message ApplicationServiceListRequest {
+  Integration integration = 1;
+  string kind = 2;
+  string page_token = 3;
+}
+
+message ApplicationServiceListResponse {
+  repeated Application applications = 1;
+
+  // Empty on the last page.
+  string next_page_token = 2;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Services
+// ---------------------------------------------------------------------------------------------
+
+// Mandatory for every plugin.
+service PluginService {
+  // Describes the plugin: what its integrations need (their inputs) and the resources they manage.
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+
+  // Checks an integration, for example that the inputs are valid and the credentials work.
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+}
+
+// For plugins whose integrations support access as a whole (INTEGRATION_CAPABILITY_ACCESS):
+// giving identities roles on the integration, taking them away, and checking what they hold.
+service IntegrationService {
+  rpc GrantAccess(IntegrationServiceGrantAccessRequest) returns (IntegrationServiceGrantAccessResponse);
+  rpc RevokeAccess(IntegrationServiceRevokeAccessRequest) returns (IntegrationServiceRevokeAccessResponse);
+  rpc CheckAccess(IntegrationServiceCheckAccessRequest) returns (IntegrationServiceCheckAccessResponse);
+}
+
+// For plugins that manage resources. Each call applies only to resource kinds that declared the
+// matching capability in ResourceDefinition.capabilities: access for GrantAccess, RevokeAccess and
+// CheckAccess, provisioning for Provision and Deprovision, discovery for List.
+service ResourceService {
+  rpc GrantAccess(ResourceServiceGrantAccessRequest) returns (ResourceServiceGrantAccessResponse);
+  rpc RevokeAccess(ResourceServiceRevokeAccessRequest) returns (ResourceServiceRevokeAccessResponse);
+  rpc CheckAccess(ResourceServiceCheckAccessRequest) returns (ResourceServiceCheckAccessResponse);
+  rpc Provision(ResourceServiceProvisionRequest) returns (ResourceServiceProvisionResponse);
+  rpc Deprovision(ResourceServiceDeprovisionRequest) returns (ResourceServiceDeprovisionResponse);
+  rpc List(ResourceServiceListRequest) returns (ResourceServiceListResponse);
+}
+
+// For plugins whose integrations run applications (IntegrationDefinition.applications): deployable
+// things with a source and open-ended variables.
+service ApplicationService {
+  rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse);
+  rpc Delete(ApplicationServiceDeleteRequest) returns (ApplicationServiceDeleteResponse);
+  rpc Deploy(ApplicationServiceDeployRequest) returns (ApplicationServiceDeployResponse);
+  rpc SetVariables(ApplicationServiceSetVariablesRequest) returns (ApplicationServiceSetVariablesResponse);
+  rpc List(ApplicationServiceListRequest) returns (ApplicationServiceListResponse);
+}
