@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "[[.Name]]"
+version = "0.1.0"
+description = "[[.Title]] plugin for Steward"
+requires-python = ">=3.10"
+dependencies = [
+  "[[if .SDKPath]]steward-plugin @ file://[[.SDKPath]][[else]]steward-plugin>=[[.SDKVersion]][[end]]",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["plugin"]
