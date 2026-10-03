@@ -409,6 +409,13 @@ function serve(plugin: Plugin): void {
     process.exit(1);
   }
 
+  // A runner that has gone leaves these pipes broken, and Node crashes on the error that a direct write to
+  // one raises. console.* already ignores it; this covers process.stdout.write and process.stderr.write, so
+  // a plugin outlives its runner and a new runner can reattach to it.
+  for (const stream of [process.stdout, process.stderr]) {
+    stream.on('error', () => {});
+  }
+
   const server = new grpc.Server();
   const anyResource = plugin.resources.size > 0;
   const anyApplication = plugin.applications.size > 0;
