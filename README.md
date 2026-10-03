@@ -251,7 +251,6 @@ The other languages follow the same shape, in their own idiom:
 | [`python/`](python) | `steward-plugin` for Python. |
 | [`go/`](go) | The Go module, `github.com/treno-dev/steward-sdk/go`. |
 | [`templates/`](templates) | One template per language (`js`, `ts`, `python`, `go`), the projects `steward plugin init` writes. |
-| [`pack-templates.sh`](pack-templates.sh) | Packs the templates into the archive a release publishes. |
 
 Each SDK has a README with everything a plugin can declare: [JavaScript](js/README.md),
 [Python](python/README.md), [Go](go/README.md).

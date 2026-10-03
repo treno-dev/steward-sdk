@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: The tag is a version on main that every SDK agrees with
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "$GITHUB_REF_NAME is not a version like v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "$GITHUB_REF_NAME is not on main" >&2
+            exit 1
+          fi
+
+          js=$(python3 -c "import json; print(json.load(open('js/package.json'))['version'])")
+          python=$(python3 -c "import tomllib; print(tomllib.load(open('python/pyproject.toml', 'rb'))['project']['version'])")
+
+          for found in "js/package.json $js" "python/pyproject.toml $python"; do
+            set -- $found
+
+            if [ "$2" != "$version" ]; then
+              echo "$1 is at $2 but the tag is $version" >&2
+              exit 1
+            fi
+          done
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          case "$version" in
+            *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  ci:
+    name: CI
+    needs: guard
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  release:
+    name: Publish the release
+    needs: [guard, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+      PRERELEASE: ${{ needs.guard.outputs.prerelease }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pack the templates
+        run: |
+          stage=$(mktemp -d)
+
+          mkdir -p "$stage/templates" out
+          cp -R templates/. "$stage/templates/"
+          echo "$VERSION" > "$stage/VERSION"
+
+          tar -czf out/templates.tar.gz -C "$stage" VERSION templates
+          (cd out && sha256sum templates.tar.gz > templates.tar.gz.sha256)
+
+      - name: Create the release
+        run: |
+          flags=""
+
+          if [ "$PRERELEASE" = "true" ]; then
+            flags="--prerelease"
+          fi
+
+          gh release create "$GITHUB_REF_NAME" out/templates.tar.gz out/templates.tar.gz.sha256 \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag $flags
+
+      - name: Tag the Go module
+        run: |
+          git tag "go/$GITHUB_REF_NAME"
+          git push origin "go/$GITHUB_REF_NAME"
