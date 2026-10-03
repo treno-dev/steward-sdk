@@ -1,5 +1,5 @@
 // The Steward plugin SDK for JavaScript: the plumbing between the plugin contract (gRPC, see
-// ../proto) and the plain objects a plugin works with.
+// ../../proto) and the plain objects a plugin works with.
 //
 //   const plugin = createPlugin({ name: 'github', version: '0.1.0', inputs: [...], validate });
 //   plugin.resource({ kind: 'repository', inputs: [...], provision, deprovision, list });
@@ -42,6 +42,17 @@ const APP_PROTOCOL_VERSION = 1;
 
 type MaybePromise<T> = T | Promise<T>;
 
+// Protobuf lets a message be absent, so the generated types mark every message field as possibly
+// undefined. The runner always sends what a handler needs, and `fill` below makes sure of it, so a
+// handler's request has its message fields present. Optional scalars, such as an identity's
+// externalId, stay optional because they really can be missing.
+type Present<Value> = NonNullable<Value> extends object ? Complete<NonNullable<Value>> : Value;
+type Complete<Message> = Message extends (infer Item)[]
+  ? Complete<Item>[]
+  : Message extends object
+    ? { [Field in keyof Message]: Present<Message[Field]> }
+    : Message;
+
 // For a generated service definition, the handler of each call: it takes the request and returns
 // the response, which may leave fields out.
 export type Handlers<Service> = {
@@ -49,8 +60,8 @@ export type Handlers<Service> = {
     requestDeserialize: (value: Buffer) => infer Request;
     responseDeserialize: (value: Buffer) => infer Response;
   }
-  ? (request: Request) => MaybePromise<DeepPartial<Response>>
-  : never;
+    ? (request: Complete<Request>) => MaybePromise<DeepPartial<Response>>
+    : never;
 };
 
 type Describe = {
@@ -94,7 +105,7 @@ type AnyRequest = {
 
 type Target = 'integration' | 'resource' | 'application';
 
-const ACCESS_CALLS = ['grantAccess', 'revokeAccess', 'checkAccess'] as const;
+const ACCESS_CALLS = ['grantAccess', 'revokeAccess', 'getAccess'] as const;
 const PROVISIONING_CALLS = ['provision', 'deprovision'] as const;
 
 function has(options: object, calls: readonly string[]): boolean {
@@ -232,12 +243,50 @@ function toStatus(error: unknown): grpc.ServiceError {
   return { code: grpc.status.INTERNAL, message } as grpc.ServiceError;
 }
 
+// Makes the message fields a handler relies on present, so it can read `integration.inputs.x`
+// without checking. An absent message becomes the generated type's default, and an absent Struct
+// becomes an empty object.
+const MESSAGES: Record<string, MessageType> = {
+  integration: contract.Integration,
+  resource: contract.Resource,
+  application: contract.Application,
+  identity: contract.Identity,
+  role: contract.Role,
+  source: contract.ApplicationSource,
+};
+const STRUCTS = ['inputs', 'outputs', 'attrs'];
+
+function fill(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(fill);
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+
+  const message = value as Record<string, unknown>;
+
+  for (const [field, item] of Object.entries(message)) {
+    const absent = item === undefined || item === null;
+
+    if (absent && field in MESSAGES) {
+      message[field] = fill(MESSAGES[field].fromPartial({}));
+      continue;
+    }
+
+    message[field] = absent && STRUCTS.includes(field) ? {} : fill(item);
+  }
+
+  return message;
+}
+
 function unary(path: string, handler: (request: AnyRequest) => unknown): grpc.handleUnaryCall<unknown, unknown> {
   const response = responseType(path);
 
   return (call, callback) => {
     Promise.resolve()
-      .then(() => handler(call.request as AnyRequest))
+      .then(() => handler(fill(call.request) as AnyRequest))
       .then((result) => callback(null, response.fromPartial(result ?? {})))
       .catch((error) => callback(toStatus(error)));
   };

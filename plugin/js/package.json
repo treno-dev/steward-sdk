@@ -15,7 +15,9 @@
   "scripts": {
     "generate": "buf generate",
     "build": "buf generate && tsc",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "readme": "node scripts/readme.mjs",
+    "readme:check": "node scripts/readme.mjs --check"
   },
   "license": "UNLICENSED",
   "dependencies": {
