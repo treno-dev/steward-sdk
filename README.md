@@ -3,11 +3,31 @@
 Everything you need to write a Steward plugin: the contract, SDKs for Go, JavaScript, TypeScript and
 Python, and the templates `steward plugin init` starts a project from.
 
-A plugin connects Steward to one tool, the way a provider does in Terraform. It says what it needs to
-connect (a URL, a token), what it can manage there (repositories, buckets, projects) and what can be
-granted on those (roles, permissions), and it carries out the calls Steward makes: create this, remove
-that, give this person that role. Steward decides what should happen and keeps the state. The plugin
-only does it.
+## What a plugin is, and why
+
+Steward manages who has access to what: it decides that someone should get a role on a repository,
+a project or a cloud account, for how long, and who must approve it. But every tool does that
+differently. GitHub has organizations, teams and repository roles. AWS has accounts, IAM users and
+policies. Jira has sites, projects and groups. Creating a repository or giving someone a role means
+calling that tool's own API, in its own terms.
+
+A **plugin** is the piece that knows one tool. It connects Steward to it, the way a provider does in
+Terraform. It says what it needs to connect (a URL, a token), what it can manage there (repositories,
+buckets, projects) and what can be granted on those (roles, permissions), and it carries out the calls
+Steward makes: create this, remove that, give this person that role. Steward decides what should
+happen and keeps the state. The plugin only does it.
+
+Plugins exist for three reasons:
+
+- **Steward cannot know every tool.** There are far too many for one team to build, and each changes
+  its API on its own schedule. A small, stable contract lets anyone add a tool, and lets the community
+  do it, without changes to Steward.
+- **Steward should not run other people's code.** Plugins are programs written by whoever needs them,
+  sometimes privately inside a company. They run in a runner that the person using them operates in
+  their own environment, next to the tools and credentials involved, and not on Steward's servers.
+- **Every tool must look the same to Steward.** Whatever the tool, Steward asks the same questions and
+  gets the same kinds of answers, so approvals, expiry, audit history and the interface work identically
+  for all of them.
 
 ## How it works
 
