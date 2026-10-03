@@ -24,8 +24,8 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
 
-          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
-            echo "$GITHUB_REF_NAME is not a version like v1.2.3 or v1.2.3-rc.1" >&2
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?$'; then
+            echo "$GITHUB_REF_NAME is not a version like v1.2.3 or v1.2.3-rc.1 (alpha, beta or rc)" >&2
             exit 1
           fi
 
@@ -37,11 +37,14 @@ jobs:
           js=$(python3 -c "import json; print(json.load(open('js/package.json'))['version'])")
           python=$(python3 -c "import tomllib; print(tomllib.load(open('python/pyproject.toml', 'rb'))['project']['version'])")
 
-          for found in "js/package.json $js" "python/pyproject.toml $python"; do
+          # Python spells a pre-release 1.2.3rc1 where semver and the tag write 1.2.3-rc.1.
+          python_version=$(echo "$version" | sed -E 's/-alpha\./a/; s/-beta\./b/; s/-rc\./rc/')
+
+          for found in "js/package.json $js $version" "python/pyproject.toml $python $python_version"; do
             set -- $found
 
-            if [ "$2" != "$version" ]; then
-              echo "$1 is at $2 but the tag is $version" >&2
+            if [ "$2" != "$3" ]; then
+              echo "$1 is at $2 but the tag $GITHUB_REF_NAME needs $3" >&2
               exit 1
             fi
           done
