@@ -23,12 +23,12 @@ None of that work happens inside Steward. It happens in the **external systems**
 uses: GitHub, AWS, Google Cloud, Jira, Cloudflare, a database server, an internal admin panel. Each of
 these has its own vocabulary and its own API:
 
-| System | Resources it provisions | Applications it runs | Access it grants |
-|---|---|---|---|
-| GitHub | repositories, teams | | `read`, `write`, `admin` on a repository |
-| AWS | buckets, databases, accounts | containers, functions | policies made of actions such as `s3:GetObject` |
-| A hosting platform | sites, databases | web apps deployed from git | team membership |
-| Jira | projects | | project roles such as `Developer` |
+| System             | Resources it provisions      | Applications it runs       | Access it grants                                |
+| ------------------ | ---------------------------- | -------------------------- | ----------------------------------------------- |
+| GitHub             | repositories, teams          |                            | `read`, `write`, `admin` on a repository        |
+| AWS                | buckets, databases, accounts | containers, functions      | policies made of actions such as `s3:GetObject` |
+| A hosting platform | sites, databases             | web apps deployed from git | team membership                                 |
+| Jira               | projects                     |                            | project roles such as `Developer`               |
 
 Steward needs to do the same few things in all of them: create things, remove things, deploy things,
 let someone in, change what they can do, take it away. But "create a bucket" or "give Amina write
@@ -54,7 +54,8 @@ Those calls fall into three kinds of work. A plugin supports whichever fit its s
 - **Resource provisioning:** create and remove resources, and report what they produced, such as a URL
   or an id. Optionally, list resources that already exist so they can be brought under Steward.
 - **Application management:** create, deploy and delete applications, which are run from a source
-  (a git repository or an image) and have variables, such as a web app and its environment.
+  (a GitHub repository, a container image, an S3 archive or a path) and have variables, such as a web app
+  and its environment.
 - **Access:** grant, revoke and report someone's roles, on the system as a whole (membership of the
   GitHub organization) or on one resource (a role on one repository).
 
@@ -102,9 +103,9 @@ the record of it, and works out what changed. The plugin is told what to do, doe
 1. **A plugin is a program.** You write it with an SDK and build or run it like any other. Steward
    never runs plugin code itself: a runner, which people operate in their own environment, starts the
    plugin as a subprocess when it needs it.
-2. **The runner and the plugin speak gRPC.** The plugin listens on a local port and prints one line,
-   the handshake, so the runner knows where to connect. Then the runner describes the plugin, checks
-   its health and calls it.
+2. **The runner and the plugin speak gRPC.** The plugin listens on a unix socket that only the runner's
+   user can open (a local port on Windows) and prints one line, the handshake, so the runner knows where
+   to connect. Then the runner describes the plugin, checks its health and calls it.
 3. **The contract is a protobuf file.** [`proto/steward/plugin/v1/plugin.proto`](proto/steward/plugin/v1/plugin.proto)
    defines every message and call. The SDKs are generated from it, so they all behave the same way.
    Within `v1` the contract only grows.
@@ -118,13 +119,24 @@ The SDKs are a convenience, not a requirement. The runner speaks the protocol of
 [`hashicorp/go-plugin`](https://github.com/hashicorp/go-plugin) (a subprocess, a handshake line, gRPC),
 so a plugin can be written in any language that can serve gRPC. A program is a Steward plugin if it:
 
-1. **prints the handshake line** on stdout, `1|1|tcp|127.0.0.1:<port>|grpc`, once it is listening;
+1. **prints the handshake line** on stdout once it is listening, `1|1|unix|<socket path>|grpc` (or
+   `1|1|tcp|127.0.0.1:<port>|grpc`);
 2. **serves the services of the contract**: `PluginService` always, and `IntegrationService`,
    `ResourceService` and `ApplicationService` for what it supports, generated from
    [the proto](proto/steward/plugin/v1/plugin.proto) with `protoc` or `buf` in your language; and
 3. **serves the standard gRPC health service**, reporting `SERVING` for the service named `plugin`.
 
 That is the whole obligation. Nothing else is needed, and the plugin never has to import Steward code.
+
+A runner also sets some environment, which a plugin should honour:
+
+| Variable | What the plugin does |
+|---|---|
+| `STEWARD_PLUGIN` | The magic cookie. Without it, the plugin was started by hand, so it says so on standard error and exits. The value is in [`go/plugin/handshake.go`](go/plugin/handshake.go). |
+| `PLUGIN_UNIX_SOCKET_DIR` | When set, listen on a unix socket created in this directory, which only the runner's user can open, and announce it in the handshake. Without it, listen on a loopback port. |
+
+A plugin can also serve `plugin.GRPCController/Shutdown`, a call with empty messages that go-plugin makes
+to ask it to stop. Without it the runner waits two seconds and then kills the plugin.
 
 What the SDK adds is what makes writing one easy: it does those three things for you, turns the
 `google.protobuf.Struct` values into plain objects, routes each call to your function by kind, builds
@@ -159,24 +171,30 @@ tool applied it), not a report of what changed. Steward works out the difference
 steward plugin init my-plugin --language js    # or ts, python, go
 cd my-plugin
 npm install
-npm start
+steward plugin validate node src/plugin.js
 ```
 
 This is the heart of what that generates, shortened. The full file, with every call and its comments,
 is [`templates/js/src/plugin.js.tmpl`](templates/js/src/plugin.js.tmpl).
 
 ```js
-import { createPlugin } from '@treno-dev/steward-sdk/plugin';
+import { createPlugin } from "@treno-dev/steward-sdk/plugin";
 
 // The integration: what it takes to connect to the tool.
 const plugin = createPlugin({
-  name: 'my-plugin',
-  version: '0.1.0',
-  title: 'My plugin',
+  name: "my-plugin",
+  version: "0.1.0",
+  title: "My plugin",
 
   inputs: [
-    { name: 'base_url', label: 'Base URL', type: 'string', required: true },
-    { name: 'token', label: 'API token', type: 'string', required: true, sensitive: true },
+    { name: "base_url", label: "Base URL", type: "string", required: true },
+    {
+      name: "token",
+      label: "API token",
+      type: "string",
+      required: true,
+      sensitive: true,
+    },
   ],
 
   // Return an error for each input the user can fix.
@@ -184,7 +202,7 @@ const plugin = createPlugin({
     const errors = [];
 
     if (!integration.secrets.token) {
-      errors.push({ field: 'token', message: 'An API token is required.' });
+      errors.push({ field: "token", message: "An API token is required." });
     }
 
     return { errors };
@@ -193,10 +211,13 @@ const plugin = createPlugin({
 
 // A kind of resource it manages.
 plugin.resource({
-  kind: 'item',
-  title: 'Item',
-  outputs: [{ name: 'url', label: 'URL', type: 'string' }],
-  roles: [{ name: 'read', title: 'Read' }, { name: 'write', title: 'Write' }],
+  kind: "item",
+  title: "Item",
+  outputs: [{ name: "url", label: "URL", type: "string" }],
+  roles: [
+    { name: "read", title: "Read" },
+    { name: "write", title: "Write" },
+  ],
 
   // Create the resource. Idempotent. Return what it produced.
   async provision({ integration, name }) {
@@ -224,23 +245,25 @@ plugin.resource({
 plugin.serve();
 ```
 
-Run it by hand and it prints the handshake line and waits:
+A plugin is started by a runner, which sets what it needs in the environment. Started by hand it says
+so and exits, so try it with `steward plugin validate node src/plugin.js` (see below). The runner reads
+one line from it, the handshake, and then calls it:
 
 ```
-1|1|tcp|127.0.0.1:54010|grpc
+1|1|unix|/tmp/steward-2871798330/plugin-4855f4bd|grpc
 ```
 
-Everything after that is the runner calling it. Handlers receive plain objects and may leave out any
-field of the response they have nothing to say about. To fail a call, throw `{ code, message }` with a
-gRPC status code. Logs go to stderr, because stdout is reserved for the handshake.
+Handlers receive plain objects and may leave out any field of the response they have nothing to say
+about. To fail a call, throw `{ code, message }` with a gRPC status code. Write logs to standard error,
+which the runner collects.
 
 The other languages follow the same shape, in their own idiom:
 
-| Language | Install | Declare | A handler |
-|---|---|---|---|
-| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk` | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ integration, name }) { ... }` |
-| Python | `pip install treno-dev-steward-sdk` | `create_plugin(...)`, `plugin.resource(kind=..., ...)` | `async def provision(request): ...` |
-| Go | `go get github.com/treno-dev/steward-sdk/go` | `plugin.New(...)`, `integration.Resource("kind", ...)` | `func(ctx, *Request) (*Response, error)` |
+| Language               | Install                                      | Declare                                                 | A handler                                        |
+| ---------------------- | -------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------ |
+| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk`         | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ integration, name }) { ... }` |
+| Python                 | `pip install treno-dev-steward-sdk`          | `create_plugin(...)`, `plugin.resource(kind=..., ...)`  | `async def provision(request): ...`              |
+| Go                     | `go get github.com/treno-dev/steward-sdk/go` | `plugin.New(...)`, `integration.Resource("kind", ...)`  | `func(ctx, *Request) (*Response, error)`         |
 
 Each is one SDK package per language, and the plugin code is its `plugin` part: `@treno-dev/steward-sdk/plugin`
 in JavaScript, `steward_sdk.plugin` in Python and `…/go/plugin` in Go. Other parts of the SDK will sit
@@ -248,12 +271,12 @@ beside it, under the same package name.
 
 ## What is here
 
-| | |
-|---|---|
-| [`proto/`](proto) | The contract, with `buf` lint and breaking-change checks. |
-| [`js/`](js) | `@treno-dev/steward-sdk` for JavaScript and TypeScript. |
-| [`python/`](python) | `treno-dev-steward-sdk` for Python, imported as `steward_sdk`. |
-| [`go/`](go) | The Go module, `github.com/treno-dev/steward-sdk/go`. |
+|                           |                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------- |
+| [`proto/`](proto)         | The contract, with `buf` lint and breaking-change checks.                                          |
+| [`js/`](js)               | `@treno-dev/steward-sdk` for JavaScript and TypeScript.                                            |
+| [`python/`](python)       | `treno-dev-steward-sdk` for Python, imported as `steward_sdk`.                                     |
+| [`go/`](go)               | The Go module, `github.com/treno-dev/steward-sdk/go`.                                              |
 | [`templates/`](templates) | One template per language (`js`, `ts`, `python`, `go`), the projects `steward plugin init` writes. |
 
 Each SDK has a README with everything a plugin can declare: [JavaScript](js/README.md),
@@ -262,12 +285,124 @@ Each SDK has a README with everything a plugin can declare: [JavaScript](js/READ
 ## Templates
 
 `steward plugin init` does not carry its examples. It downloads the templates of an SDK release and
-checks them against their checksum, so a new project always matches the SDK it depends on. To work on
-an SDK and its template together, point the CLI at a checkout of this repository:
+checks them against their checksum, so a new project always matches the SDK it depends on.
 
 ```sh
-steward plugin init my-plugin --language js --sdk-path /path/to/steward-sdk
+steward plugin init my-plugin --language js
 ```
+
+The project is created in a folder named after the plugin, in the current directory. The name takes
+lowercase letters, numbers and dashes. While it works, the command prints a line for each step, such as
+getting the templates and writing the project.
+
+| Flag               |                                                                                                                                                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--language`, `-l` | Required: `js`, `ts`, `python` or `go`.                                                                                                                                                                                                                                                                                              |
+| `--path`, `-p`     | The directory to create the plugin's folder in. The default is the current directory. A folder of the plugin's name that already exists must be empty.                                                                                                                                                                               |
+| `--sdk-version`    | The SDK release to take the templates from. The default is the latest release; pre-releases such as `0.1.0-rc.1` have to be asked for.                                                                                                                                                                                               |
+| `--template`       | Templates from somewhere else, instead of the release: anything [go-getter](https://github.com/hashicorp/go-getter) understands, such as a URL, a path or a git repository, holding `templates/<language>`. Add `?checksum=sha256:…` to verify it. With `--template`, `--sdk-version` says which SDK version the project depends on. |
+| `--sdk-path`       | A checkout of this repository, for working on an SDK and its template together. The project depends on the SDK in that checkout.                                                                                                                                                                                                     |
+
+```sh
+steward plugin init my-plugin -l python --path ~/code/plugins
+steward plugin init my-plugin -l js --sdk-version 0.1.0-rc.1
+steward plugin init my-plugin -l js --sdk-path /path/to/steward-sdk
+```
+
+## Check and run a plugin
+
+Two commands start a plugin the way a runner would and talk to it, whatever language it is written in.
+Give either one the command that starts the plugin. `steward plugin validate` checks it and never changes
+anything. `steward plugin run` invokes it, for real.
+
+### Validate
+
+```sh
+steward plugin validate node src/plugin.js
+steward plugin validate .venv/bin/python src/plugin.py
+steward plugin validate go run .
+```
+
+```sh
+steward plugin validate node src/plugin.js
+steward plugin validate .venv/bin/python src/plugin.py
+steward plugin validate go run .
+```
+
+```
+✓ handshake           tcp 127.0.0.1:50984, contract version 1
+✓ health              the service "plugin" is SERVING
+✓ describe            my-plugin 0.1.0: 1 resource kind(s) (item), 0 application kind(s)
+✓ inputs              every input and output has a name and a known type
+✓ item access         declared, and GetAccess is served
+✓ standard output     only the handshake line
+```
+
+It only reads: it checks the handshake, the health service, what the plugin describes about itself, that
+`Validate` answers, that each kind serves access and discovery exactly when it declares them, and that
+nothing but the handshake line goes to standard output. It never creates or changes anything, so it is
+safe to run against real credentials.
+
+### Run
+
+`steward plugin run` invokes the plugin with a context file saying what to use. It gives the identity a
+role on the integration, then for each resource in the context creates it twice (a second call must
+succeed and return the same outputs), gives the identity a role on it and takes the role away, and
+removes it twice. It removes what it created even when a step fails.
+
+It does all of this for real, in whatever the plugin's credentials reach, so point it at a test account.
+It lists what it is about to do and asks before it starts, unless you pass `--yes`, which a script or CI
+needs because there is nobody to ask.
+
+```sh
+steward plugin run --context context.json node src/plugin.js
+steward plugin run --yes --context context.json go run .
+```
+
+To work on one call at a time, name it with `--call`. It makes only that call, once, on every resource in
+the context, prints what the plugin answered, and cleans nothing up, since leaving what a call made in
+place is the point. The calls are `provision`, `grant-access`, `get-access`, `revoke-access` and
+`deprovision`. Repeat the flag, or separate names with commas, to make several, and they run in lifecycle
+order. The access calls also run against the integration when it declares access.
+
+```sh
+steward plugin run --context context.json --call provision node src/plugin.js
+✓ item/demo provision  {"outputs":{"url":"https://example.test/items/demo"}}
+
+steward plugin run --context context.json --call grant-access --call get-access node src/plugin.js
+steward plugin run --context context.json --call deprovision node src/plugin.js
+```
+
+A call a kind doesn't declare, such as `grant-access` on a kind without access, is skipped. Responses are
+printed as they come, so outputs marked sensitive show in your terminal as well.
+
+### The context file
+
+```json
+{
+  "integration": {
+    "inputs": { "base_url": "https://example.test" },
+    "secrets": { "token": "..." }
+  },
+  "identity": { "external_id": "someone" },
+  "role": { "name": "read" },
+  "resources": [
+    { "kind": "item", "name": "demo", "inputs": { "description": "a test item" } },
+    { "kind": "item", "name": "second" }
+  ]
+}
+```
+
+- **`integration`** holds the connection values the plugin is invoked with, as an integration would supply
+  them: its inputs and its secrets.
+- **`resources`** is a list of the requests that create resources. Each has a `kind` the plugin declares, a
+  `name`, and the `inputs` and `secrets` of that kind. They run in the order listed, and you can list
+  several of the same kind. Each `kind` and `name` pair can appear once.
+- **`identity`** and **`role`** are who is given which role, on the integration and on each resource.
+
+`run` needs the file. `validate` can take it too, with `--context`, to give the integration the read-only
+calls are made with. Both commands exit with a failure when a check fails, so they can run in CI, and
+`--verbose` shows what the plugin writes to standard error.
 
 ## Developing
 
@@ -277,8 +412,8 @@ commits `go/gen`, because Go users install a module as it is.
 
 ```sh
 cd proto && buf lint && buf build && buf format -d    # check the contract
-cd js && npm install && npm run build                  # JavaScript and TypeScript
-cd python && python scripts/generate.py                # Python
+cd js && npm install && buf generate && npm run build  # JavaScript and TypeScript
+cd python && buf generate                              # Python
 cd go && buf generate && go vet ./...                  # Go
 ```
 

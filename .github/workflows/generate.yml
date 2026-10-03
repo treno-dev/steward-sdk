@@ -1,0 +1,60 @@
+name: Generate
+
+# The Go module is installed from git as it is, so the code generated from the contract has to be
+# committed. This regenerates it when the contract changes on main, and commits what differs. A push made
+# with the workflow's token does not start other workflows, so this cannot loop.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - proto/**
+      - go/buf.gen.yaml
+      - .github/workflows/generate.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: generate-go
+  cancel-in-progress: false
+
+jobs:
+  go:
+    name: Regenerate the Go contract
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+          token: ${{ secrets.BUF_TOKEN }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - run: buf generate
+
+      - name: Commit what changed
+        working-directory: .
+        run: |
+          if git diff --quiet -- go/gen; then
+            echo "go/gen is current"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add go/gen
+          git commit -m "Regenerate the Go contract"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - run: go vet ./...
+      - run: go build ./...

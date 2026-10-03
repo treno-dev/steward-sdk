@@ -52,8 +52,8 @@ jobs:
           cache-dependency-path: js/package-lock.json
 
       - run: npm ci
+      - run: buf generate
       - run: npm run build
-      - run: npm run readme:check
 
   python:
     name: Python
@@ -74,12 +74,14 @@ jobs:
           python-version: "3.12"
 
       - run: pip install -e ".[dev]"
-      - run: python scripts/generate.py
-      - run: python scripts/readme.py --check
+      - run: buf generate
       - run: python -m build
 
   go:
     name: Go
+    # On main, the Generate workflow regenerates the committed code and checks it builds. This job is for
+    # pull requests and releases, where stale generated code is an error to fix, not to commit.
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -100,7 +102,12 @@ jobs:
       - name: The committed generated code is current
         run: |
           buf generate
-          git diff --exit-code -- gen
+
+          if ! git diff --quiet -- gen; then
+            echo "go/gen is out of date: run \`buf generate\` in go/ and commit the result" >&2
+            git diff --stat -- gen
+            exit 1
+          fi
 
       - run: go vet ./...
       - run: go build ./...

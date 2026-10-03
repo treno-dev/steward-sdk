@@ -22,7 +22,7 @@ Requires Node.js (tested on 24). The package is ES modules and ships its TypeScr
 steward plugin init my-plugin --language js    # or --language ts
 cd my-plugin
 npm install
-npm start
+steward plugin validate node src/plugin.js
 ```
 
 `steward plugin init` takes its templates from the SDK release, so the project always matches the
@@ -32,100 +32,38 @@ SDK it depends on. To work on the SDK and its templates together, point it at a 
 
 ## A plugin
 
-This is the plugin that `steward plugin init --language js` generates, with a resource that can be
-provisioned and given access to. The block below is filled in from the template by `npm run readme`,
-so the two never differ.
+`steward plugin init --language js` generates a plugin with a resource that can be provisioned and given
+access to. The whole file, with every call and its comments, is
+[`templates/js/src/plugin.js.tmpl`](https://github.com/treno-dev/steward-sdk/blob/main/templates/js/src/plugin.js.tmpl).
+In short:
 
-<!-- template: ../templates/js/src/plugin.js.tmpl -->
 ```js
-// This is the file you edit. It declares what your plugin offers and implements the calls Steward
-// makes. The gRPC plumbing, the handshake and the health check live in the Steward SDK.
-//
-// A plugin is one integration, like a provider. Declare it and each kind of resource once, with
-// its handlers attached: Steward's forms and the capabilities of each kind (provisioning,
-// discovery, access) follow from what you write here, and every call is routed to the right
-// handler by kind. If your plugin needs more than one tool, take the credentials for each as inputs.
-
 import { createPlugin } from '@treno-dev/steward-sdk/plugin';
 
-// The integration is one connection to the tool. Steward builds its form from `inputs`, so it is
-// also the documentation people see. Mark credentials `sensitive`: they arrive in
-// `integration.secrets`, the other inputs in `integration.inputs`.
 const plugin = createPlugin({
   name: 'my-plugin',
   version: '0.1.0',
-  title: 'My plugin',
-  description: 'Connects Steward to My plugin.',
-
-  // What is required to create an integration from this plugin.
   inputs: [
     { name: 'base_url', label: 'Base URL', type: 'string', required: true },
     { name: 'token', label: 'API token', type: 'string', required: true, sensitive: true },
   ],
-
-  // Check that the inputs and credentials work. Return an error per input the user can fix.
-  async validate({ integration }) {
-    const errors = [];
-
-    if (!integration.secrets.token) {
-      errors.push({ field: 'token', message: 'An API token is required.' });
-    }
-
-    return { errors };
-  },
 });
 
-// A kind of resource this integration manages. Handlers receive the request as a plain object and
-// return the response as one, leaving out any field they have nothing to say about.
 plugin.resource({
   kind: 'item',
-  title: 'Item',
-  description: 'An example resource.',
-  // What a resource of this kind takes besides its name, which Steward stores with the kind.
-  inputs: [{ name: 'description', label: 'Description', type: 'string' }],
   outputs: [{ name: 'url', label: 'URL', type: 'string' }],
 
-  // Create a resource called `name`. Idempotent: if it already exists, succeed anyway. Return what
-  // it produced, as declared in `outputs`.
-  async provision({ integration, name, inputs }) {
-    const url = `${integration.inputs.base_url}/items/${name}`;
-
-    return { outputs: { url } };
+  async provision({ integration, name }) {
+    return { outputs: { url: `${integration.inputs.base_url}/items/${name}` } };
   },
 
-  // Remove a resource. Idempotent: succeed if it is already gone.
   async deprovision({ resource }) {
     return {};
-  },
-
-  // What can be granted on this kind: the tool's roles, and the permissions each contains. Writing
-  // the three access handlers below is what makes the kind accept access.
-  roles: [
-    { name: 'read', title: 'Read', permissions: [{ name: 'view' }] },
-    { name: 'write', title: 'Write', permissions: [{ name: 'view' }, { name: 'edit' }] },
-  ],
-
-  // Give an identity a role on the resource. Idempotent. Return the role as the tool applied it,
-  // an `id` for the grant if the tool has one, and `pending: true` if the person has to act first,
-  // such as accepting an invitation. `identity` has `externalId`, `name` and `attrs` (an email, say).
-  async grantAccess({ integration, resource, identity, role }) {
-    return { role };
-  },
-
-  // Take a role away. Idempotent: succeed if the identity does not have it.
-  async revokeAccess({ integration, resource, identity, role }) {
-    return {};
-  },
-
-  // Report the roles the identity holds on the resource now, and whether a grant is still pending.
-  async getAccess({ integration, resource, identity }) {
-    return { roles: [], pending: false };
   },
 });
 
 plugin.serve();
 ```
-<!-- /template -->
 
 A plugin needs one `createPlugin(...)`, any number of `plugin.resource(...)` and
 `plugin.application(...)` declarations, and a final `plugin.serve()`. If it needs more than one tool,
@@ -140,13 +78,16 @@ for example both Cloudflare and AWS, take the credentials for each as inputs.
 | `name`, `version` | Required. |
 | `title`, `description` | Shown in Steward. |
 | `inputs` | What is required to create an integration, credentials included. |
-| `validate` | Checks the inputs and credentials. Returns `{ errors: [{ field, message }] }`. |
+| `validate` | Optional. Checks the credentials, which Steward cannot. Returns `{ errors: [{ field, message }] }`. Without it, every integration is accepted. |
 | `roles`, `permissions`, `grantAccess`, `revokeAccess`, `getAccess` | Access to the integration as a whole, such as membership of an organization. |
 
 **A resource**, with `plugin.resource({ kind, ... })`, and **an application**, with
 `plugin.application({ kind, ... })`, both have a `kind` that is unique within the plugin, a `title`,
 a `description`, `inputs` and `outputs`. Resources also take `roles` and `permissions`. Applications
-take `sources` (`'git'`, `'image'`).
+take `sources`, the types they can be deployed from: `'github'`, `'registry'`, `'s3'` or `'raw'`. The
+`source` of an application arrives as `{ type, config, ref }`, where `config` holds the settings of that
+type: `github` `{ owner, name, branch? }`, `registry` `{ image, tag? }`, `s3` `{ bucket, key }` and `raw`
+`{ path }`. `ref` pins a commit, an image digest or an object version, and is empty for the newest.
 
 **Inputs and outputs** are declared like variables:
 
@@ -263,7 +204,8 @@ Anything else you throw is reported as an internal error. A call for an unknown 
 
 ## Logging
 
-Write logs to stderr. Standard output is reserved for the one handshake line the runner reads.
+Write logs to standard error (`console.error`), which the runner collects. What a plugin prints to
+standard output after the handshake is not shown.
 
 ## Developing the SDK
 
@@ -272,7 +214,6 @@ not committed.
 
 ```sh
 npm install
-npm run build        # buf generate, then tsc into dist/
-npm run readme       # refill the example above from ../templates/js
-npm run readme:check # fail if the example is out of date (for CI)
+buf generate         # the messages into src/gen
+npm run build        # tsc into dist/
 ```

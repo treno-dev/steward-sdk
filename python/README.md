@@ -23,7 +23,7 @@ steward plugin init my-plugin --language python
 cd my-plugin
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-python src/plugin.py
+steward plugin validate python src/plugin.py
 ```
 
 `steward plugin init` takes its templates from the SDK release, so the project always matches the
@@ -32,124 +32,43 @@ SDK it depends on. To work on the SDK and its templates together, point it at a 
 
 ## A plugin
 
-This is the plugin that `steward plugin init --language python` generates, with a resource that can be
-provisioned and given access to. The block below is filled in from the template by
-`python scripts/readme.py`, so the two never differ.
+`steward plugin init --language python` generates a plugin with a resource that can be provisioned and
+given access to. The whole file, with every call and its comments, is
+[`templates/python/src/plugin.py.tmpl`](https://github.com/treno-dev/steward-sdk/blob/main/templates/python/src/plugin.py.tmpl).
+In short:
 
-<!-- template: ../templates/python/src/plugin.py.tmpl -->
 ```python
-# This is the file you edit. It declares what your plugin offers and implements the calls Steward
-# makes. The gRPC plumbing, the handshake and the health check live in the Steward SDK.
-#
-# A plugin is one integration, like a provider. Declare it and each kind of resource once, with
-# its handlers attached: Steward's forms and the capabilities of each kind (provisioning,
-# discovery, access) follow from what you write here, and every call is routed to the right
-# handler by kind. If your plugin needs more than one tool, take the credentials for each as inputs.
-#
-# Each handler is annotated with the request and response types the SDK exports, named for the
-# entity and the call (ResourceProvisionRequest, ResourceProvisionResponse). A request is the
-# generated message, so your editor completes its fields; a response is a message or a plain dict
-# with the fields you have something to say about. Handlers may be async or plain functions.
-
-from steward_sdk.plugin import (
-    IntegrationValidateRequest,
-    IntegrationValidateResponse,
-    ResourceDeprovisionRequest,
-    ResourceDeprovisionResponse,
-    ResourceGetAccessRequest,
-    ResourceGetAccessResponse,
-    ResourceGrantAccessRequest,
-    ResourceGrantAccessResponse,
-    ResourceProvisionRequest,
-    ResourceProvisionResponse,
-    ResourceRevokeAccessRequest,
-    ResourceRevokeAccessResponse,
-    create_plugin,
-)
+from steward_sdk.plugin import create_plugin
 
 
-# Check that the inputs and credentials work. Return an error per input the user can fix.
-async def validate(request: IntegrationValidateRequest) -> IntegrationValidateResponse:
-    errors = []
-
-    if not request.integration.secrets.get("token"):
-        errors.append({"field": "token", "message": "An API token is required."})
-
-    return {"errors": errors}
-
-
-# Create a resource called `request.name`. Idempotent: if it already exists, succeed anyway. Return
-# what it produced, as declared in `outputs`. The request also has `integration` and `inputs`.
-async def provision(request: ResourceProvisionRequest) -> ResourceProvisionResponse:
+async def provision(request):
     base_url = request.integration.inputs["base_url"]
 
     return {"outputs": {"url": f"{base_url}/items/{request.name}"}}
 
 
-# Remove a resource. Idempotent: succeed if it is already gone. The request has `integration` and
-# `resource` (`kind`, `name`).
-async def deprovision(request: ResourceDeprovisionRequest) -> ResourceDeprovisionResponse:
+async def deprovision(request):
     return {}
 
 
-# Give an identity a role on the resource. Idempotent. Return the role as the tool applied it, an
-# `id` for the grant if the tool has one, and `pending: True` if the person has to act first, such
-# as accepting an invitation. The request has `integration`, `resource`, `identity` (`external_id`,
-# `name`, `attrs`) and `role`.
-async def grant_access(request: ResourceGrantAccessRequest) -> ResourceGrantAccessResponse:
-    return {"role": request.role}
-
-
-# Take a role away. Idempotent: succeed if the identity does not have it.
-async def revoke_access(request: ResourceRevokeAccessRequest) -> ResourceRevokeAccessResponse:
-    return {}
-
-
-# Report the roles the identity holds on the resource now, and whether a grant is still pending.
-async def get_access(request: ResourceGetAccessRequest) -> ResourceGetAccessResponse:
-    return {"roles": [], "pending": False}
-
-
-# The integration is one connection to the tool. Steward builds its form from `inputs`, so it is
-# also the documentation people see. Mark credentials `sensitive`: they arrive in
-# `request.integration.secrets`, the other inputs in `request.integration.inputs`.
 plugin = create_plugin(
     name="my-plugin",
     version="0.1.0",
-    title="My plugin",
-    description="Connects Steward to My plugin.",
-    # What is required to create an integration from this plugin.
     inputs=[
         {"name": "base_url", "label": "Base URL", "type": "string", "required": True},
         {"name": "token", "label": "API token", "type": "string", "required": True, "sensitive": True},
     ],
-    validate=validate,
 )
 
-# A kind of resource this integration manages.
 plugin.resource(
     kind="item",
-    title="Item",
-    description="An example resource.",
-    # What a resource of this kind takes besides its name, which Steward stores with the kind.
-    inputs=[{"name": "description", "label": "Description", "type": "string"}],
     outputs=[{"name": "url", "label": "URL", "type": "string"}],
-    # What can be granted on this kind: the tool's roles, and the permissions each contains. Writing
-    # the three access handlers is what makes the kind accept access.
-    roles=[
-        {"name": "read", "title": "Read", "permissions": [{"name": "view"}]},
-        {"name": "write", "title": "Write", "permissions": [{"name": "view"}, {"name": "edit"}]},
-    ],
     provision=provision,
     deprovision=deprovision,
-    grant_access=grant_access,
-    revoke_access=revoke_access,
-    get_access=get_access,
 )
 
 plugin.serve()
 ```
-<!-- /template -->
 
 A plugin needs one `create_plugin(...)`, any number of `plugin.resource(...)` and
 `plugin.application(...)` declarations, and a final `plugin.serve()`. If it needs more than one tool,
@@ -159,18 +78,21 @@ for example both Cloudflare and AWS, take the credentials for each as inputs.
 
 **The integration**, in `create_plugin`:
 
-| Argument | |
-|---|---|
-| `name`, `version` | Required. |
-| `title`, `description` | Shown in Steward. |
-| `inputs` | What is required to create an integration, credentials included. |
-| `validate` | Checks the inputs and credentials. Returns `{"errors": [{"field": ..., "message": ...}]}`. |
-| `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the integration as a whole, such as membership of an organization. |
+| Argument                                                              |                                                                                                                                                            |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`, `version`                                                     | Required.                                                                                                                                                  |
+| `title`, `description`                                                | Shown in Steward.                                                                                                                                          |
+| `inputs`                                                              | What is required to create an integration, credentials included.                                                                                           |
+| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every integration is accepted. |
+| `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the integration as a whole, such as membership of an organization.                                                                               |
 
 **A resource**, with `plugin.resource(kind=..., ...)`, and **an application**, with
 `plugin.application(kind=..., ...)`, both have a `kind` that is unique within the plugin, a `title`, a
 `description`, `inputs` and `outputs`. Resources also take `roles` and `permissions`. Applications take
-`sources` (`"git"`, `"image"`).
+`sources`, the types they can be deployed from: `"github"`, `"registry"`, `"s3"` or `"raw"`. The `source`
+of an application arrives as `type`, `config` and `ref`, where `config` holds the settings of that type:
+`github` `{owner, name, branch?}`, `registry` `{image, tag?}`, `s3` `{bucket, key}` and `raw` `{path}`.
+`ref` pins a commit, an image digest or an object version, and is empty for the newest.
 
 **Inputs and outputs** are declared like variables:
 
@@ -236,12 +158,12 @@ you are given in full.
 
 You never list capabilities. The SDK reads them from the handlers you pass:
 
-| You pass | The kind can |
-|---|---|
-| `provision`, `deprovision` | be created and removed (provisioning) |
-| `list` | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
-| `grant_access`, `revoke_access`, `get_access` | have access granted (resources and the integration) |
-| `create`, `delete`, `deploy`, `set_variables`, `list` | be run as an application |
+| You pass                                              | The kind can                                                                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `provision`, `deprovision`                            | be created and removed (provisioning)                                                                                        |
+| `list`                                                | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
+| `grant_access`, `revoke_access`, `get_access`         | have access granted (resources and the integration)                                                                          |
+| `create`, `delete`, `deploy`, `set_variables`, `list` | be run as an application                                                                                                     |
 
 A call for something you did not pass fails with `UNIMPLEMENTED`.
 
@@ -286,8 +208,8 @@ answered with `NOT_FOUND` by the SDK.
 
 ## Logging
 
-Write logs to stderr (the `logging` module does by default). Standard output is reserved for the one
-handshake line the runner reads.
+Write logs to standard error (the `logging` module does by default), which the runner collects. What a
+plugin prints to standard output after the handshake is not shown.
 
 ## Developing the SDK
 
@@ -298,8 +220,6 @@ versions in `buf.gen.yaml` decide the minimum `protobuf` and `grpcio` the packag
 ```sh
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-python scripts/generate.py          # the contract into src/steward_sdk/_gen
-python scripts/readme.py            # refill the example above from ../templates/python
-python scripts/readme.py --check    # fail if the example is out of date (for CI)
-python -m build                     # the wheel and sdist, with the generated code
+buf generate        # the messages into src/steward_sdk/_gen
+python -m build     # the wheel and sdist, with the generated code
 ```

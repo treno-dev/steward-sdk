@@ -1,6 +1,6 @@
 {
   "name": "@treno-dev/steward-sdk",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "The Steward SDK for JavaScript and TypeScript: write Steward plugins",
   "type": "module",
   "repository": {
@@ -21,11 +21,7 @@
     "dist"
   ],
   "scripts": {
-    "generate": "buf generate",
-    "build": "buf generate && tsc",
-    "prepack": "npm run build",
-    "readme": "node scripts/readme.mjs",
-    "readme:check": "node scripts/readme.mjs --check"
+    "build": "tsc"
   },
   "license": "UNLICENSED",
   "dependencies": {

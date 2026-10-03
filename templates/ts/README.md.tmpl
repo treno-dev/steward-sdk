@@ -6,12 +6,12 @@ A Steward plugin for [[.Title]], built with [`@treno-dev/steward-sdk`](https://g
 
 ```sh
 npm install
-npm start
+steward plugin validate node src/plugin.ts
 ```
 
-Node runs `src/plugin.ts` directly. Steward starts the plugin itself and talks to it over gRPC.
-Running it by hand prints the handshake line the runner reads, and nothing else on standard output.
-Write logs to stderr.
+Node runs `src/plugin.ts` directly. A plugin is started by a runner, not by hand: run directly it says so
+and exits. Use `steward plugin validate` to check it, and
+`steward plugin run --context context.json node src/plugin.ts` to invoke it. Write logs to standard error.
 
 Run `npm run check` to type-check.
 

@@ -86,6 +86,8 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
+      - run: buf generate
+      - run: npm run build
 
       - name: Publish with provenance, using the trusted publisher
         run: npm publish --provenance --access public ${{ needs.guard.outputs.prerelease == 'true' && '--tag next' || '' }}
@@ -113,7 +115,7 @@ jobs:
         working-directory: python
         run: |
           pip install build
-          python scripts/generate.py
+          buf generate
           python -m build
 
       - uses: pypa/gh-action-pypi-publish@v1.14.2

@@ -22,7 +22,7 @@ Requires Go 1.25 or newer.
 steward plugin init my-plugin --language go
 cd my-plugin
 go mod tidy
-go run .
+steward plugin validate go run .
 ```
 
 `steward plugin init` takes its templates from the SDK release, so the project always matches the SDK
@@ -55,14 +55,17 @@ integration.Serve()
 | `Name`, `Version` | Required. |
 | `Title`, `Description` | Shown in Steward. |
 | `Inputs` | What is required to create an integration, credentials included. |
-| `Validate` | Checks the inputs and credentials. Returns `ValidationError`s the user can fix. |
+| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every integration is accepted. |
 | `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the integration as a whole, such as membership of an organization. |
 
 **A resource**, with `integration.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,
 with `integration.Application("kind", plugin.ApplicationOptions{...})`, are each declared under a kind that
 is unique within the plugin, such as `"repository"`, and take a `Title`, a `Description`, `Inputs` and
-`Outputs`. Resources also take `Roles` and `Permissions`.
-Applications take `Sources` (`"git"`, `"image"`).
+`Outputs`. Resources also take `Roles` and `Permissions`. Applications take `Sources`, the types they can
+be deployed from: `"github"`, `"registry"`, `"s3"` or `"raw"`. The `Source` of an application arrives as
+`Type`, `Config` and `Ref`, where `Config` holds the settings of that type: `github` `{owner, name,
+branch?}`, `registry` `{image, tag?}`, `s3` `{bucket, key}` and `raw` `{path}`. `Ref` pins a commit, an
+image digest or an object version, and is empty for the newest.
 
 **Inputs and outputs** are declared like variables:
 
@@ -150,7 +153,8 @@ reported as `INTERNAL`. A call for an unknown kind is answered with `NotFound` b
 
 ## Logging
 
-Write logs to stderr. Standard output is reserved for the one handshake line the runner reads.
+Write logs to standard error, which the runner collects. A plugin must be started by a runner, which sets
+what `plugin.Handshake` describes: started by hand it says so and exits, so use `steward plugin validate`.
 
 ## Developing the SDK
 
