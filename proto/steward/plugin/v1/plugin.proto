@@ -11,8 +11,9 @@ import "google/protobuf/struct.proto";
 // resource kind is declared in Describe through capabilities; a call for a capability that was not
 // declared fails with UNIMPLEMENTED. Within v1 the contract is additive only.
 //
-// Calls that change state report whether they did anything in a `changed` field. Failures, such as
-// an unreachable tool or an invalid request, are returned as gRPC errors instead.
+// Calls that change state are idempotent and return the result of the change, not a report of what
+// changed: Steward keeps the state and works out the difference itself. Failures, such as an
+// unreachable tool or an invalid request, are returned as gRPC errors.
 //
 // The file has the messages first, then the services at the bottom.
 
@@ -38,8 +39,9 @@ message Resource {
   // A kind declared in IntegrationDefinition.resources, for the integration the call is for.
   string kind = 1;
 
-  // The resource's identity in the tool, such as a repository's full name.
-  string id = 2;
+  // The resource's name in the tool, such as a repository's full name. Steward stores it with the
+  // kind and sends it on every later call, which is how a resource is identified.
+  string name = 2;
 
   // Values for the inputs declared in ResourceDefinition.inputs that are not sensitive, keyed by
   // input name.
@@ -50,8 +52,9 @@ message Resource {
   map<string, string> secrets = 4;
 
   // Values the resource produced, as declared in ResourceDefinition.outputs, keyed by output name.
-  // Set by the plugin when it provisions or lists a resource; ignored on calls. Values of outputs
-  // declared sensitive stay with the runner and are not passed on to Steward.
+  // Set by the plugin when it lists a resource; ignored on calls. Provision returns its outputs
+  // separately. Values of outputs declared sensitive stay with the runner and are not passed on to
+  // Steward.
   google.protobuf.Struct outputs = 5;
 }
 
@@ -334,7 +337,7 @@ message ValidationError {
 // Access to the integration as a whole, such as membership of a GitHub organization. Steward
 // grants it before it grants access to the integration's resources, and decides when to remove it.
 //
-// Idempotent: granting what is already granted succeeds with changed = false.
+// Idempotent: granting what is already granted succeeds.
 message IntegrationServiceGrantAccessRequest {
   Integration integration = 1;
   Identity identity = 2;
@@ -342,24 +345,21 @@ message IntegrationServiceGrantAccessRequest {
 }
 
 message IntegrationServiceGrantAccessResponse {
-  // False when the identity already had the role.
-  bool changed = 1;
-
   // The grant's own identity in the tool, such as a membership or invitation id. Empty when the
   // tool has none. Steward records it and sends it back on revoke.
-  string id = 2;
+  string id = 1;
 
   // The role as the tool actually applied it. It can differ from the one requested: a custom role
   // may land as a native role, or as only the permissions the tool supports.
-  Role role = 3;
+  Role role = 2;
 
   // True when the grant needs the identity to act before it takes effect, such as accepting an
   // invitation. The access is not in effect yet.
-  bool pending = 4;
+  bool pending = 3;
 }
 
-// Idempotent: revoking what is already absent succeeds with changed = false. Steward works out
-// overlap between roles before it sends a revoke, so the role here is safe to remove in full.
+// Idempotent: revoking what is already absent succeeds. Steward works out overlap between roles
+// before it sends a revoke, so the role here is safe to remove in full.
 message IntegrationServiceRevokeAccessRequest {
   Integration integration = 1;
   Identity identity = 2;
@@ -369,19 +369,16 @@ message IntegrationServiceRevokeAccessRequest {
   string id = 4;
 }
 
-message IntegrationServiceRevokeAccessResponse {
-  // False when the identity did not have the role.
-  bool changed = 1;
-}
+message IntegrationServiceRevokeAccessResponse {}
 
 // Asks what an identity holds on the integration now, for example to skip an invitation to
 // someone who is already a member, or to find drift.
-message IntegrationServiceCheckAccessRequest {
+message IntegrationServiceGetAccessRequest {
   Integration integration = 1;
   Identity identity = 2;
 }
 
-message IntegrationServiceCheckAccessResponse {
+message IntegrationServiceGetAccessResponse {
   // The roles the identity holds. Empty when it has none.
   repeated Role roles = 1;
 
@@ -400,7 +397,7 @@ message IntegrationServiceCheckAccessResponse {
 // Access to one resource, such as a role on a repository. Steward grants it after the identity has
 // access to the integration.
 //
-// Idempotent: granting what is already granted succeeds with changed = false.
+// Idempotent: granting what is already granted succeeds.
 message ResourceServiceGrantAccessRequest {
   Integration integration = 1;
   Resource resource = 2;
@@ -409,24 +406,21 @@ message ResourceServiceGrantAccessRequest {
 }
 
 message ResourceServiceGrantAccessResponse {
-  // False when the identity already had the role.
-  bool changed = 1;
-
   // The grant's own identity in the tool, such as an assignment or invitation id. Empty when the
   // tool has none. Steward records it and sends it back on revoke.
-  string id = 2;
+  string id = 1;
 
   // The role as the tool actually applied it. It can differ from the one requested: a custom role
   // may land as a native role, or as only the permissions the tool supports.
-  Role role = 3;
+  Role role = 2;
 
   // True when the grant needs the identity to act before it takes effect, such as accepting an
   // invitation. The access is not in effect yet.
-  bool pending = 4;
+  bool pending = 3;
 }
 
-// Idempotent: revoking what is already absent succeeds with changed = false. Steward works out
-// overlap between roles before it sends a revoke, so the role here is safe to remove in full.
+// Idempotent: revoking what is already absent succeeds. Steward works out overlap between roles
+// before it sends a revoke, so the role here is safe to remove in full.
 message ResourceServiceRevokeAccessRequest {
   Integration integration = 1;
   Resource resource = 2;
@@ -437,19 +431,16 @@ message ResourceServiceRevokeAccessRequest {
   string id = 5;
 }
 
-message ResourceServiceRevokeAccessResponse {
-  // False when the identity did not have the role.
-  bool changed = 1;
-}
+message ResourceServiceRevokeAccessResponse {}
 
 // Asks what an identity holds on a resource now.
-message ResourceServiceCheckAccessRequest {
+message ResourceServiceGetAccessRequest {
   Integration integration = 1;
   Resource resource = 2;
   Identity identity = 3;
 }
 
-message ResourceServiceCheckAccessResponse {
+message ResourceServiceGetAccessResponse {
   // The roles the identity holds on the resource. Empty when it has none.
   repeated Role roles = 1;
 
@@ -457,41 +448,39 @@ message ResourceServiceCheckAccessResponse {
   bool pending = 2;
 }
 
-// Idempotent: provisioning something that already exists with the same identity returns it with
-// changed = false.
+// Idempotent: provisioning something that already exists with the same kind and name succeeds, and
+// still returns its outputs. Steward works out what changed by comparing the state it stores.
 message ResourceServiceProvisionRequest {
   Integration integration = 1;
 
   // The kind to create, as declared in IntegrationDefinition.resources.
   string kind = 2;
 
-  // Its inputs, validated against the kind's schema. The id is chosen by the tool or derived from
-  // the inputs, and comes back in the response.
-  google.protobuf.Struct inputs = 3;
+  // What to call it in the tool. Steward stores the name with the kind.
+  string name = 3;
+
+  // Its inputs, validated against the kind's definition.
+  google.protobuf.Struct inputs = 4;
 
   // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
   // call only.
-  map<string, string> secrets = 4;
+  map<string, string> secrets = 5;
 }
 
 message ResourceServiceProvisionResponse {
-  // False when the resource already existed.
-  bool changed = 1;
-
-  // The resource as it now exists, with its identity in the tool.
-  Resource resource = 2;
+  // What the resource produced, as declared in ResourceDefinition.outputs, keyed by output name,
+  // such as a URL or an id the tool assigned. Values of outputs declared sensitive stay with the
+  // runner and are not passed on to Steward.
+  google.protobuf.Struct outputs = 1;
 }
 
-// Idempotent: removing something that is already gone succeeds with changed = false.
+// Idempotent: removing something that is already gone succeeds.
 message ResourceServiceDeprovisionRequest {
   Integration integration = 1;
   Resource resource = 2;
 }
 
-message ResourceServiceDeprovisionResponse {
-  // False when the resource was already gone.
-  bool changed = 1;
-}
+message ResourceServiceDeprovisionResponse {}
 
 message ResourceServiceListRequest {
   Integration integration = 1;
@@ -510,8 +499,7 @@ message ResourceServiceListResponse {
 // ApplicationService messages
 // ---------------------------------------------------------------------------------------------
 
-// Idempotent: creating an application that already exists with the same identity returns it with
-// changed = false.
+// Idempotent: creating an application that already exists with the same identity returns it.
 message ApplicationServiceCreateRequest {
   Integration integration = 1;
 
@@ -525,23 +513,17 @@ message ApplicationServiceCreateRequest {
 }
 
 message ApplicationServiceCreateResponse {
-  // False when the application already existed.
-  bool changed = 1;
-
   // The application as it now exists, with its identity in the tool.
-  Application application = 2;
+  Application application = 1;
 }
 
-// Idempotent: removing an application that is already gone succeeds with changed = false.
+// Idempotent: removing an application that is already gone succeeds.
 message ApplicationServiceDeleteRequest {
   Integration integration = 1;
   Application application = 2;
 }
 
-message ApplicationServiceDeleteResponse {
-  // False when the application was already gone.
-  bool changed = 1;
-}
+message ApplicationServiceDeleteResponse {}
 
 // Deploys the application from a source, replacing what is running.
 message ApplicationServiceDeployRequest {
@@ -570,10 +552,7 @@ message ApplicationServiceSetVariablesRequest {
   repeated string remove = 4;
 }
 
-message ApplicationServiceSetVariablesResponse {
-  // False when nothing differed from what was asked.
-  bool changed = 1;
-}
+message ApplicationServiceSetVariablesResponse {}
 
 message ApplicationServiceListRequest {
   Integration integration = 1;
@@ -606,16 +585,16 @@ service PluginService {
 service IntegrationService {
   rpc GrantAccess(IntegrationServiceGrantAccessRequest) returns (IntegrationServiceGrantAccessResponse);
   rpc RevokeAccess(IntegrationServiceRevokeAccessRequest) returns (IntegrationServiceRevokeAccessResponse);
-  rpc CheckAccess(IntegrationServiceCheckAccessRequest) returns (IntegrationServiceCheckAccessResponse);
+  rpc GetAccess(IntegrationServiceGetAccessRequest) returns (IntegrationServiceGetAccessResponse);
 }
 
 // For plugins that manage resources. Each call applies only to resource kinds that declared the
 // matching capability in ResourceDefinition.capabilities: access for GrantAccess, RevokeAccess and
-// CheckAccess, provisioning for Provision and Deprovision, discovery for List.
+// GetAccess, provisioning for Provision and Deprovision, discovery for List.
 service ResourceService {
   rpc GrantAccess(ResourceServiceGrantAccessRequest) returns (ResourceServiceGrantAccessResponse);
   rpc RevokeAccess(ResourceServiceRevokeAccessRequest) returns (ResourceServiceRevokeAccessResponse);
-  rpc CheckAccess(ResourceServiceCheckAccessRequest) returns (ResourceServiceCheckAccessResponse);
+  rpc GetAccess(ResourceServiceGetAccessRequest) returns (ResourceServiceGetAccessResponse);
   rpc Provision(ResourceServiceProvisionRequest) returns (ResourceServiceProvisionResponse);
   rpc Deprovision(ResourceServiceDeprovisionRequest) returns (ResourceServiceDeprovisionResponse);
   rpc List(ResourceServiceListRequest) returns (ResourceServiceListResponse);
