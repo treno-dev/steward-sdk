@@ -13,6 +13,32 @@ A plugin is started by a runner, not by hand: run directly it says so and exits.
 `steward plugin validate` to check it, and `steward plugin run --context context.json go run .` to invoke
 it. Write logs to standard error.
 
+## Test
+
+Save this as `context.json`, the integration and resources to call the plugin with:
+
+```json
+{
+  "integration": {
+    "inputs": { "base_url": "https://example.test" },
+    "secrets": { "token": "secret" }
+  },
+  "identity": { "external_id": "someone@example.test" },
+  "role": { "name": "read" },
+  "resources": [{ "kind": "item", "name": "demo", "inputs": { "description": "A demo item" } }]
+}
+```
+
+```sh
+steward plugin run --context context.json go run .
+steward plugin run --context context.json --call provision go run .
+```
+
+The first creates each resource, grants and revokes the role, and removes it. It does this for real, in
+whatever your credentials reach, and asks before it starts (`--yes` skips the question). `--call` makes
+only the calls you name, once each and without cleaning up: `provision`, `grant-access`, `get-access`,
+`revoke-access` and `deprovision`. `steward plugin validate` never changes anything.
+
 ## Where things are
 
 `main.go` declares the integration (what it needs to connect), each kind of resource and the handlers

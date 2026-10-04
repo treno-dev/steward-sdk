@@ -346,9 +346,8 @@ safe to run against real credentials.
 ### Run
 
 `steward plugin run` invokes the plugin with a context file saying what to use. It gives the identity a
-role on the integration, then for each resource in the context creates it twice (a second call must
-succeed and return the same outputs), gives the identity a role on it and takes the role away, and
-removes it twice. It removes what it created even when a step fails.
+role on the integration, then for each resource in the context creates it, gives the identity a role on
+it and takes the role away, and removes it. It removes what it created even when a step fails.
 
 It does all of this for real, in whatever the plugin's credentials reach, so point it at a test account.
 It lists what it is about to do and asks before it starts, unless you pass `--yes`, which a script or CI
