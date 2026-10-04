@@ -533,7 +533,6 @@ message ApplicationServiceDestroyResponse {}
 message ApplicationServiceDeployRequest {
   PluginConfig config = 1;
   Application application = 2;
-
   // What to deploy. Unset means redeploy from the application's current source.
   ApplicationSource source = 3;
 }
