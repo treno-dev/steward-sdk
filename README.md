@@ -430,18 +430,37 @@ steward plugin docs node src/plugin.js
 steward plugin docs --out site python src/plugin.py
 ```
 
-The pages are written to `dist/docs`, or to `--out`, inside the plugin's folder (`--dir`, the current
-directory by default). Text you write is added to the generated pages:
+The pages are written to `docs`, or to `--out`, in the plugin's folder (the current directory, or the one
+given with `--cwd`). Commit them, so the registry reads them with the plugin.
 
-| File                            |                                                         |
-| ------------------------------- | ------------------------------------------------------- |
-| `docs/index.md`                 | The plugin page.                                        |
-| `docs/resources/<kind>.md`      | A resource kind.                                        |
-| `docs/applications/<kind>.md`   | An application kind.                                    |
-| `examples/<kind>.json`          | A sample resource: `{ "kind", "name", "inputs" }`.      |
+Each page can be a template, so you decide where the generated parts go. A page without one uses a
+default layout:
 
-Every file is optional. A page is the generated title and description, your text, the example, and then
-the tables. Write a `description` on every input, secret and output, because that is what the tables show.
+| File                                      |                                                    |
+| ----------------------------------------- | -------------------------------------------------- |
+| `templates/index.md.tmpl`                 | The plugin page.                                   |
+| `templates/resources/<kind>.md.tmpl`      | A resource kind.                                   |
+| `templates/applications/<kind>.md.tmpl`   | An application kind.                               |
+| `examples/<kind>.json`                    | A sample resource: `{ "kind", "name", "inputs" }`. |
+
+A file ending in `.md.tmpl` is a Go template. Place the generated parts with `{{ .Title }}`,
+`{{ .Description }}`, `{{ .Example }}`, `{{ .Inputs }}`, `{{ .Secrets }}`, `{{ .Outputs }}`,
+`{{ .Sources }}` (applications), `{{ .Roles }}` and `{{ .Permissions }}`, or all the tables at once with
+`{{ .Reference }}`. The plugin page also has `{{ .Resources }}` and `{{ .Applications }}`, the lists of
+links. A part with nothing to show is empty. The same name ending in `.md`, such as
+`templates/index.md`, is used as it is.
+
+```
+# {{ .Title }}
+
+Start here: this plugin manages items.
+
+{{ .Secrets }}
+{{ .Resources }}
+```
+
+Every file is optional. Write a `description` on every input, secret and output, because that is what the
+tables show.
 
 ## Developing
 
