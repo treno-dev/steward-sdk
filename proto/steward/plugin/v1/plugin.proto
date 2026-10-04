@@ -5,11 +5,10 @@ package steward.plugin.v1;
 import "google/protobuf/struct.proto";
 
 // The plugin contract. Every plugin serves PluginService: it describes itself, validates its config
-// and, when it supports access as a whole, grants it. A plugin that has resources also serves
-// ResourceService, and one that runs applications serves ApplicationService. Which of those calls
-// apply to the plugin or to a resource kind is not declared: Steward calls, and a call the plugin does
-// not offer fails with UNIMPLEMENTED. The one exception is access, which is implied by declaring
-// roles or permissions. Within v1 the contract is additive only.
+// and, when it declares roles or permissions, grants access as a whole. A plugin that has resources
+// also serves ResourceService, and one that runs applications serves ApplicationService. A plugin
+// offers a call by implementing it. A call it does not offer fails with UNIMPLEMENTED, and Steward
+// treats that as not offered. Within v1 the contract is additive only.
 //
 // Calls that change state are idempotent and return the result of the change, not a report of what
 // changed: Steward keeps the state and works out the difference itself. Failures, such as an

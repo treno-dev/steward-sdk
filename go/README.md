@@ -107,11 +107,11 @@ They return:
 Steward works out overlap between roles before it asks you to revoke one, so you can remove the role
 you are given in full.
 
-## What you set is what is offered
+## What Steward offers
 
-You never list what a kind can do. Steward calls, and a call for something you did not set fails with
-`UNIMPLEMENTED`, which means it is not offered. The one thing you declare is access: roles or
-permissions say that it is supported.
+Steward offers what you implement. A call for a handler you did not set answers `UNIMPLEMENTED`, and
+Steward treats that as not offered. Access also needs its `Roles` or `Permissions`, which tell Steward
+what can be granted.
 
 | You set | The kind can |
 |---|---|

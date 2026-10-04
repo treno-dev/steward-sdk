@@ -158,10 +158,10 @@ road, and a plugin in Rust, Java or anything else is the same contract without t
 - **Applications** (optional): things that are deployed from a source and have open-ended variables,
   as opposed to resources, which are provisioned.
 
-Nothing lists what a kind can do. Steward calls, and a call for a function you did not write answers
-`UNIMPLEMENTED`, which means it is not offered: with `provision` and `deprovision` a kind can be
-created and removed, with `list` it can be discovered, and with roles or permissions and the access
-functions it can have access granted.
+Steward offers what you implement. With `provision` and `deprovision` a kind can be created and
+removed, with `list` it can be discovered, and with roles or permissions and the access functions it
+can have access granted. A call for a function you did not write answers `UNIMPLEMENTED`, and Steward
+treats that as not offered.
 
 Calls that change something are **idempotent** and return the **result** (the outputs, the role as the
 tool applied it), not a report of what changed. Steward works out the difference itself.
