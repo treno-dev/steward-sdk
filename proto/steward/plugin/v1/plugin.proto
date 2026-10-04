@@ -20,15 +20,14 @@ import "google/protobuf/struct.proto";
 // Shared messages
 // ---------------------------------------------------------------------------------------------
 
-// What a plugin is configured with for a call: the inputs, including the sensitive ones, it needs to
-// reach the tools it works with. A plugin must not persist the sensitive values.
+// What a plugin is configured with for a call: its inputs and its secrets, which are kept, sent and
+// logged separately. A plugin must not persist the secrets.
 message PluginConfig {
-  // Values for the inputs declared in PluginDefinition.inputs that are not sensitive, keyed by
-  // input name.
+  // Values for the inputs declared in PluginDefinition.inputs, keyed by input name.
   google.protobuf.Struct inputs = 1;
 
-  // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
-  // call only.
+  // Values for the secrets declared in PluginDefinition.secrets, keyed by secret name. Resolved by
+  // the runner for this call only.
   map<string, string> secrets = 2;
 }
 
@@ -41,12 +40,11 @@ message Resource {
   // kind and sends it on every later call, which is how a resource is identified.
   string name = 2;
 
-  // Values for the inputs declared in ResourceDefinition.inputs that are not sensitive, keyed by
-  // input name.
+  // Values for the inputs declared in ResourceDefinition.inputs, keyed by input name.
   google.protobuf.Struct inputs = 3;
 
-  // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
-  // call only, like PluginConfig.secrets.
+  // Values for the secrets declared in ResourceDefinition.secrets, keyed by secret name. Resolved
+  // by the runner for this call only, like PluginConfig.secrets.
   map<string, string> secrets = 4;
 
   // Values the resource produced, as declared in ResourceDefinition.outputs, keyed by output name.
@@ -64,9 +62,10 @@ message Application {
   // The application's identity in the tool.
   string id = 2;
 
-  // Values for the inputs declared in ApplicationDefinition.inputs, keyed by input name. Values of
-  // sensitive inputs go in `secrets`, as for a resource.
+  // Values for the inputs declared in ApplicationDefinition.inputs, keyed by input name.
   google.protobuf.Struct inputs = 3;
+
+  // Values for the secrets declared in ApplicationDefinition.secrets, keyed by secret name.
   map<string, string> secrets = 4;
 
   // Values the application produced, as declared in ApplicationDefinition.outputs.
@@ -171,7 +170,7 @@ message DescribeResponse {
   string version = 2;
 
   // What the plugin offers. A plugin that needs several tools takes the credentials for each as
-  // inputs.
+  // secrets.
   PluginDefinition definition = 3;
 }
 
@@ -179,9 +178,11 @@ message PluginDefinition {
   string title = 1;
   string description = 2;
 
-  // What is required to configure this plugin, credentials included: those are inputs marked
-  // sensitive.
+  // The settings this plugin is configured with, such as a base URL or an organization name.
   repeated InputDefinition inputs = 3;
+
+  // The credentials this plugin is configured with, such as an API token or a private key.
+  repeated SecretDefinition secrets = 8;
 
   // The resource kinds this plugin manages. Kinds are unique within the plugin.
   repeated ResourceDefinition resources = 4;
@@ -200,9 +201,9 @@ message PluginDefinition {
   repeated ApplicationDefinition applications = 7;
 }
 
-// One value a plugin or a resource takes, declared the way a variable is: a name and a type, with
-// the value passed separately. Values travel keyed by `name`: in PluginConfig.inputs or Resource.inputs,
-// or, for sensitive inputs, in their `secrets` map.
+// One setting a plugin, a resource or an application takes, declared the way a variable is: a name
+// and a type, with the value passed separately, keyed by `name`, in PluginConfig.inputs,
+// Resource.inputs or Application.inputs.
 message InputDefinition {
   string name = 1;
   string label = 2;
@@ -219,9 +220,15 @@ message InputDefinition {
 
   // The choices for a "select".
   repeated string options = 7;
+}
 
-  // The value is a secret, such as a token or a private key. It is never shown back once set.
-  bool sensitive = 8;
+// One credential a plugin, a resource or an application takes, such as an API token or a private
+// key. Secrets are separate from inputs: they are stored, sent and shown differently. The value is
+// passed in the `secrets` map, keyed by `name`, for one call only, and is never shown back once set.
+message SecretDefinition {
+  string name = 1;
+  string description = 2;
+  bool required = 3;
 }
 
 // One value a resource produces, declared like an input: a name and a type. Same types as an input.
@@ -243,9 +250,11 @@ message ResourceDefinition {
   string title = 2;
   string description = 3;
 
-  // What is required to create a resource of this kind, credentials included: those are inputs
-  // marked sensitive. Provision takes values for these.
+  // What is required to create a resource of this kind. Provision takes values for these.
   repeated InputDefinition inputs = 4;
+
+  // The credentials a resource of this kind takes, separate from its inputs.
+  repeated SecretDefinition secrets = 8;
 
   // What can be granted on this type. Declaring permissions or roles is what says the type supports
   // access. A tool may expose permissions, roles, or both, as separate lists. Steward lets
@@ -270,6 +279,9 @@ message ApplicationDefinition {
 
   // Fixed settings of the application itself, such as a runtime or a region. Not its variables.
   repeated InputDefinition inputs = 4;
+
+  // The credentials the application takes, separate from its inputs.
+  repeated SecretDefinition secrets = 7;
 
   // The source types it can be deployed from, by name: "github", "registry", "s3" or "raw", as
   // described on ApplicationSource.
@@ -451,7 +463,7 @@ message ResourceServiceProvisionRequest {
   // Its inputs, validated against the kind's definition.
   google.protobuf.Struct inputs = 4;
 
-  // Values for the inputs declared sensitive, keyed by input name. Resolved by the runner for this
+  // Values for the secrets the kind declares, keyed by secret name. Resolved by the runner for this
   // call only.
   map<string, string> secrets = 5;
 }
@@ -492,8 +504,8 @@ message ResourceServiceListResponse {
 message ApplicationServiceCreateRequest {
   PluginConfig config = 1;
 
-  // A kind declared in PluginDefinition.applications, with its inputs and sensitive values,
-  // where it is deployed from, and its starting variables.
+  // A kind declared in PluginDefinition.applications, with its inputs and secrets, where it is
+  // deployed from, and its starting variables.
   string kind = 2;
   google.protobuf.Struct inputs = 3;
   map<string, string> secrets = 4;

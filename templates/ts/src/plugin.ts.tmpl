@@ -25,27 +25,28 @@ import {
   type ResourceRevokeAccessResponse,
 } from '@treno-dev/steward-sdk/plugin';
 
-// Steward builds the plugin's form from `inputs`, so it is also the documentation people see. Mark
-// credentials `sensitive`: they arrive in `config.secrets`, the other inputs in `config.inputs`.
+// Steward builds the plugin's form from `inputs` and `secrets`, so they are also the documentation
+// people see. Settings arrive in `config.inputs`, and credentials, kept and sent separately, in
+// `config.secrets`.
 const plugin = createPlugin({
   name: '[[.Name]]',
   version: '0.1.0',
   title: '[[.Title]]',
   description: 'Connects Steward to [[.Title]].',
 
-  // What is required to configure this plugin.
-  inputs: [
-    { name: 'base_url', label: 'Base URL', type: 'string', required: true },
-    { name: 'token', label: 'API token', type: 'string', required: true, sensitive: true },
-  ],
+  // The settings this plugin is configured with.
+  inputs: [{ name: 'base_url', label: 'Base URL', type: 'string', required: true }],
+
+  // The credentials it is configured with.
+  secrets: [{ name: 'API_TOKEN', description: 'The token to call the API with.', required: true }],
 
   // Check that the inputs and credentials work. Return an error per input the user can fix.
   async validate(request: PluginValidateRequest): Promise<PluginValidateResponse> {
     const { config } = request;
     const errors: { field: string; message: string }[] = [];
 
-    if (!config.secrets.token) {
-      errors.push({ field: 'token', message: 'An API token is required.' });
+    if (!config.secrets.API_TOKEN) {
+      errors.push({ field: 'API_TOKEN', message: 'An API token is required.' });
     }
 
     return { errors };

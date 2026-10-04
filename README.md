@@ -147,8 +147,8 @@ road, and a plugin in Rust, Java or anything else is the same contract without t
 ### The pieces of a plugin
 
 - **A config**: what the plugin is set up with. It declares its **inputs**, like variables with a name
-  and a type. Credentials are inputs marked `sensitive`, and the runner passes them to each call
-  separately so the plugin never has to store them.
+  and a type, and its **secrets**, the credentials it needs, with a name and a description. The runner
+  passes secrets to each call separately from the inputs so the plugin never has to store them.
 - **Resources**: the things the tool holds, each declared once under a **kind** (`"repository"`) with
   its own inputs and **outputs** (what comes back once it exists, such as a URL). A resource is
   identified by its kind and name.
@@ -187,23 +187,18 @@ const plugin = createPlugin({
   version: "0.1.0",
   title: "My plugin",
 
-  inputs: [
-    { name: "base_url", label: "Base URL", type: "string", required: true },
-    {
-      name: "token",
-      label: "API token",
-      type: "string",
-      required: true,
-      sensitive: true,
-    },
+  inputs: [{ name: "base_url", label: "Base URL", type: "string", required: true }],
+
+  secrets: [
+    { name: "API_TOKEN", description: "The token to call the API with.", required: true },
   ],
 
-  // Return an error for each input the user can fix.
+  // Return an error for each input or secret the user can fix.
   async validate({ config }) {
     const errors = [];
 
-    if (!config.secrets.token) {
-      errors.push({ field: "token", message: "An API token is required." });
+    if (!config.secrets.API_TOKEN) {
+      errors.push({ field: "API_TOKEN", message: "An API token is required." });
     }
 
     return { errors };
@@ -400,7 +395,7 @@ printed as they come, so outputs marked sensitive show in your terminal as well.
 {
   "config": {
     "inputs": { "base_url": "https://example.test" },
-    "secrets": { "token": "..." }
+    "secrets": { "API_TOKEN": "..." }
   },
   "identity": { "external_id": "someone" },
   "role": { "name": "viewer", "permissions": [{ "name": "view" }] },

@@ -43,10 +43,8 @@ import { createPlugin } from '@treno-dev/steward-sdk/plugin';
 const plugin = createPlugin({
   name: 'my-plugin',
   version: '0.1.0',
-  inputs: [
-    { name: 'base_url', label: 'Base URL', type: 'string', required: true },
-    { name: 'token', label: 'API token', type: 'string', required: true, sensitive: true },
-  ],
+  inputs: [{ name: 'base_url', label: 'Base URL', type: 'string', required: true }],
+  secrets: [{ name: 'API_TOKEN', description: 'The token to call the API with.', required: true }],
 });
 
 plugin.resource({
@@ -67,7 +65,7 @@ plugin.serve();
 
 A plugin needs one `createPlugin(...)`, any number of `plugin.resource(...)` and
 `plugin.application(...)` declarations, and a final `plugin.serve()`. If it needs more than one tool,
-for example both Cloudflare and AWS, take the credentials for each as inputs.
+for example both Cloudflare and AWS, take the credentials for each as secrets.
 
 ## What you declare
 
@@ -77,13 +75,14 @@ for example both Cloudflare and AWS, take the credentials for each as inputs.
 |---|---|
 | `name`, `version` | Required. |
 | `title`, `description` | Shown in Steward. |
-| `inputs` | What is required to configure the plugin, credentials included. |
+| `inputs` | The settings the plugin is configured with. |
+| `secrets` | The credentials it is configured with, such as an API token. |
 | `validate` | Optional. Checks the credentials, which Steward cannot. Returns `{ errors: [{ field, message }] }`. Without it, every config is accepted. |
 | `roles`, `permissions`, `grantAccess`, `revokeAccess`, `getAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
 **A resource**, with `plugin.resource({ kind, ... })`, and **an application**, with
 `plugin.application({ kind, ... })`, both have a `kind` that is unique within the plugin, a `title`,
-a `description`, `inputs` and `outputs`. Resources also take `roles` and `permissions`. Applications
+a `description`, `inputs`, `secrets` and `outputs`. Resources also take `roles` and `permissions`. Applications
 take `sources`, the types they can be deployed from: `'github'`, `'registry'`, `'s3'` or `'raw'`. The
 `source` of an application arrives as `{ type, config, ref }`, where `config` holds the settings of that
 type: `github` `{ owner, name, branch? }`, `registry` `{ image, tag? }`, `s3` `{ bucket, key }` and `raw`
@@ -95,8 +94,15 @@ type: `github` `{ owner, name, branch? }`, `registry` `{ image, tag? }`, `s3` `{
 { name: 'visibility', label: 'Visibility', type: 'select', options: ['private', 'public'], default: 'private' }
 ```
 
-`type` is one of `string`, `number`, `boolean`, `select`, `list` (of strings) or `map`. Mark a
-credential `sensitive: true` and it is never shown back once set.
+`type` is one of `string`, `number`, `boolean`, `select`, `list` (of strings) or `map`. Mark an output
+`sensitive: true` when it is a secret, such as a generated password, and it stays with the runner.
+
+**Secrets** are credentials, and are kept, sent and shown apart from inputs. Each has a `name`, used
+as it is, a `description` and whether it is `required`. Its value is never shown back once set.
+
+```js
+{ name: 'GITHUB_TOKEN', description: 'A token that can create repositories.', required: true }
+```
 
 ## Access
 
@@ -207,9 +213,10 @@ A handler receives the request as a plain object and returns the response as one
 any field it has nothing to say about. Field names are camelCase. In TypeScript, requests and
 responses are typed from the contract.
 
-- **Inputs.** `config.inputs` and `inputs` hold the values that are not sensitive, keyed by
-  input name. Sensitive values arrive in `config.secrets` (and a resource's or application's
-  `secrets`). Never store them. The SDK always provides these objects, empty if nothing was set.
+- **Inputs and secrets.** `config.inputs` and `inputs` hold the values of the inputs, keyed by input
+  name. The values of secrets arrive apart from them, keyed by secret name, in `config.secrets` (and a
+  resource's or application's `secrets`). Never store them. The SDK always provides these objects,
+  empty if nothing was set.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating
   what exists, or removing what is gone, simply succeeds. Return the result of the change (the
   `outputs`, the applied `role`), not a description of what changed: Steward keeps the state and

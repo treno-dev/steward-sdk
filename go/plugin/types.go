@@ -45,6 +45,7 @@ type (
 	Permission        = pluginv1.Permission
 
 	InputDefinition      = pluginv1.InputDefinition
+	SecretDefinition     = pluginv1.SecretDefinition
 	OutputDefinition     = pluginv1.OutputDefinition
 	PermissionDefinition = pluginv1.PermissionDefinition
 	RoleDefinition       = pluginv1.RoleDefinition

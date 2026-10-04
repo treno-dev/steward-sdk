@@ -54,10 +54,8 @@ async def deprovision(request):
 plugin = create_plugin(
     name="my-plugin",
     version="0.1.0",
-    inputs=[
-        {"name": "base_url", "label": "Base URL", "type": "string", "required": True},
-        {"name": "token", "label": "API token", "type": "string", "required": True, "sensitive": True},
-    ],
+    inputs=[{"name": "base_url", "label": "Base URL", "type": "string", "required": True}],
+    secrets=[{"name": "API_TOKEN", "description": "The token to call the API with.", "required": True}],
 )
 
 plugin.resource(
@@ -72,7 +70,7 @@ plugin.serve()
 
 A plugin needs one `create_plugin(...)`, any number of `plugin.resource(...)` and
 `plugin.application(...)` declarations, and a final `plugin.serve()`. If it needs more than one tool,
-for example both Cloudflare and AWS, take the credentials for each as inputs.
+for example both Cloudflare and AWS, take the credentials for each as secrets.
 
 ## What you declare
 
@@ -82,13 +80,14 @@ for example both Cloudflare and AWS, take the credentials for each as inputs.
 | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`, `version`                                                     | Required.                                                                                                                                            |
 | `title`, `description`                                                | Shown in Steward.                                                                                                                                    |
-| `inputs`                                                              | What is required to configure the plugin, credentials included.                                                                                      |
+| `inputs`                                                              | The settings the plugin is configured with.                                                                                                          |
+| `secrets`                                                             | The credentials it is configured with, such as an API token.                                                                                         |
 | `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every config is accepted. |
 | `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the plugin as a whole, such as membership of an organization.                                                                              |
 
 **A resource**, with `plugin.resource(kind=..., ...)`, and **an application**, with
 `plugin.application(kind=..., ...)`, both have a `kind` that is unique within the plugin, a `title`, a
-`description`, `inputs` and `outputs`. Resources also take `roles` and `permissions`. Applications take
+`description`, `inputs`, `secrets` and `outputs`. Resources also take `roles` and `permissions`. Applications take
 `sources`, the types they can be deployed from: `"github"`, `"registry"`, `"s3"` or `"raw"`. The `source`
 of an application arrives as `type`, `config` and `ref`, where `config` holds the settings of that type:
 `github` `{owner, name, branch?}`, `registry` `{image, tag?}`, `s3` `{bucket, key}` and `raw` `{path}`.
@@ -100,8 +99,15 @@ of an application arrives as `type`, `config` and `ref`, where `config` holds th
 {"name": "visibility", "label": "Visibility", "type": "select", "options": ["private", "public"], "default": "private"}
 ```
 
-`type` is one of `string`, `number`, `boolean`, `select`, `list` (of strings) or `map`. Mark a
-credential `"sensitive": True` and it is never shown back once set.
+`type` is one of `string`, `number`, `boolean`, `select`, `list` (of strings) or `map`. Mark an output
+`"sensitive": True` when it is a secret, such as a generated password, and it stays with the runner.
+
+**Secrets** are credentials, and are kept, sent and shown apart from inputs. Each has a `name`, used as
+it is, a `description` and whether it is `required`. Its value is never shown back once set.
+
+```python
+{"name": "GITHUB_TOKEN", "description": "A token that can create repositories.", "required": True}
+```
 
 ## Access
 
@@ -203,9 +209,10 @@ plain one runs in a thread, so blocking calls do not stall the plugin).
 - **Responses** are a response message or a plain dict with the fields you have something to say
   about (snake_case or camelCase). Messages inside it, such as the `role` you were given, can be used
   as they are. Returning nothing is an empty response.
-- **Inputs.** `config.inputs` and `inputs` hold the values that are not sensitive, keyed by input
-  name; numbers arrive as floats. Sensitive values arrive in `config.secrets` (and a resource's or
-  application's `secrets`), a plain `dict`-like of strings. Never store them.
+- **Inputs and secrets.** `config.inputs` and `inputs` hold the values of the inputs, keyed by input
+  name; numbers arrive as floats. The values of secrets arrive apart from them, keyed by secret name,
+  in `config.secrets` (and a resource's or application's `secrets`), a plain `dict`-like of strings.
+  Never store them.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating what
   exists, or removing what is gone, simply succeeds. Return the result of the change (the `outputs`,
   the applied `role`), not a description of what changed: Steward keeps the state and works out the

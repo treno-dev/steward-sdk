@@ -34,8 +34,9 @@ type Options struct {
 	Title       string
 	Description string
 
-	// Inputs is what is required to configure the plugin, credentials included.
-	Inputs []*InputDefinition
+	// Inputs are the settings the plugin is configured with; Secrets are its credentials.
+	Inputs  []*InputDefinition
+	Secrets []*SecretDefinition
 
 	// Validate checks the inputs and credentials.
 	Validate func(context.Context, *PluginValidateRequest) (*PluginValidateResponse, error)
@@ -55,8 +56,10 @@ type ResourceOptions struct {
 	Title       string
 	Description string
 
-	// Inputs is what a resource of this kind takes besides its name; Outputs is what it produces.
+	// Inputs is what a resource of this kind takes besides its name, Secrets its credentials, and
+	// Outputs what it produces.
 	Inputs  []*InputDefinition
+	Secrets []*SecretDefinition
 	Outputs []*OutputDefinition
 
 	// What can be granted on this kind: the tool's roles, the permissions, or both.
@@ -78,6 +81,7 @@ type ApplicationOptions struct {
 	Description string
 
 	Inputs  []*InputDefinition
+	Secrets []*SecretDefinition
 	Outputs []*OutputDefinition
 
 	// Sources are the source types it can be deployed from: "github", "registry", "s3" or "raw".
@@ -138,6 +142,7 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 		Title:       o.Title,
 		Description: o.Description,
 		Inputs:      o.Inputs,
+		Secrets:     o.Secrets,
 		Permissions: o.Permissions,
 		Roles:       o.Roles,
 	}
@@ -153,6 +158,7 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 			Title:       options.Title,
 			Description: options.Description,
 			Inputs:      options.Inputs,
+			Secrets:     options.Secrets,
 			Sources:     options.Sources,
 			Outputs:     options.Outputs,
 		})
@@ -167,6 +173,7 @@ func resourceDefinition(kind string, options ResourceOptions) *pluginv1.Resource
 		Title:       options.Title,
 		Description: options.Description,
 		Inputs:      options.Inputs,
+		Secrets:     options.Secrets,
 		Permissions: options.Permissions,
 		Roles:       options.Roles,
 		Outputs:     options.Outputs,

@@ -22,9 +22,9 @@ import (
 func validate(ctx context.Context, request *plugin.PluginValidateRequest) (*plugin.PluginValidateResponse, error) {
 	response := &plugin.PluginValidateResponse{}
 
-	if request.GetConfig().GetSecrets()["token"] == "" {
+	if request.GetConfig().GetSecrets()["API_TOKEN"] == "" {
 		response.Errors = append(response.Errors, &plugin.ValidationError{
-			Field:   "token",
+			Field:   "API_TOKEN",
 			Message: "An API token is required.",
 		})
 	}
@@ -68,19 +68,23 @@ func getAccess(ctx context.Context, request *plugin.ResourceGetAccessRequest) (*
 }
 
 func main() {
-	// Steward builds the plugin's form from Inputs, so it is also the documentation people see. Mark
-	// credentials Sensitive: they arrive in request.Config.Secrets, the other inputs in
-	// request.Config.Inputs.
+	// Steward builds the plugin's form from Inputs and Secrets, so they are also the documentation
+	// people see. Settings arrive in request.Config.Inputs, and credentials, kept and sent
+	// separately, in request.Config.Secrets.
 	p := plugin.New(plugin.Options{
 		Name:        "[[.Name]]",
 		Version:     "0.1.0",
 		Title:       "[[.Title]]",
 		Description: "Connects Steward to [[.Title]].",
 
-		// What is required to configure this plugin.
+		// The settings this plugin is configured with.
 		Inputs: []*plugin.InputDefinition{
 			{Name: "base_url", Label: "Base URL", Type: plugin.TypeString, Required: true},
-			{Name: "token", Label: "API token", Type: plugin.TypeString, Required: true, Sensitive: true},
+		},
+
+		// The credentials it is configured with.
+		Secrets: []*plugin.SecretDefinition{
+			{Name: "API_TOKEN", Description: "The token to call the API with.", Required: true},
 		},
 
 		Validate: validate,

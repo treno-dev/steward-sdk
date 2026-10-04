@@ -34,6 +34,7 @@ import type {
   PluginDefinition,
   ResourceDefinition,
   RoleDefinition,
+  SecretDefinition,
 } from '../gen/steward/plugin/v1/plugin.js';
 import * as contract from '../gen/steward/plugin/v1/plugin.js';
 
@@ -107,6 +108,7 @@ type Describe = {
   title?: string;
   description?: string;
   inputs?: DeepPartial<InputDefinition>[];
+  secrets?: DeepPartial<SecretDefinition>[];
 };
 
 type Access = {
@@ -151,15 +153,15 @@ function fail(code: grpc.status, message: string): never {
 }
 
 function resourceDefinition(options: ResourceOptions): DeepPartial<ResourceDefinition> {
-  const { kind, title, description, inputs, outputs, permissions, roles } = options;
+  const { kind, title, description, inputs, secrets, outputs, permissions, roles } = options;
 
-  return { kind, title, description, inputs, outputs, permissions, roles };
+  return { kind, title, description, inputs, secrets, outputs, permissions, roles };
 }
 
 function applicationDefinition(options: ApplicationOptions): DeepPartial<ApplicationDefinition> {
-  const { kind, title, description, inputs, sources, outputs } = options;
+  const { kind, title, description, inputs, secrets, sources, outputs } = options;
 
-  return { kind, title, description, inputs, sources, outputs };
+  return { kind, title, description, inputs, secrets, sources, outputs };
 }
 
 export class Plugin {
@@ -207,12 +209,13 @@ export class Plugin {
   }
 
   private definition(): DeepPartial<PluginDefinition> {
-    const { title, description, inputs, permissions, roles } = this.options;
+    const { title, description, inputs, secrets, permissions, roles } = this.options;
 
     return {
       title,
       description,
       inputs,
+      secrets,
       permissions,
       roles,
       resources: [...this.resources.values()].map(resourceDefinition),

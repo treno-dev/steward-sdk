@@ -33,7 +33,7 @@ The generated plugin, with a resource that can be provisioned and given access t
 [`../templates/go/main.go.tmpl`](../templates/go/main.go.tmpl). A plugin needs one
 `plugin.New(...)`, any number of `Resource(...)` and `Application(...)` declarations, and a final
 `Serve()`. If it needs more than one tool, for example both Cloudflare and AWS, take the credentials for
-each as inputs.
+each as secrets.
 
 ```go
 p := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
@@ -54,14 +54,15 @@ p.Serve()
 |---|---|
 | `Name`, `Version` | Required. |
 | `Title`, `Description` | Shown in Steward. |
-| `Inputs` | What is required to configure the plugin, credentials included. |
+| `Inputs` | The settings the plugin is configured with. |
+| `Secrets` | The credentials it is configured with, such as an API token. |
 | `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every config is accepted. |
 | `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
 **A resource**, with `p.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,
 with `p.Application("kind", plugin.ApplicationOptions{...})`, are each declared under a kind that
-is unique within the plugin, such as `"repository"`, and take a `Title`, a `Description`, `Inputs` and
-`Outputs`. Resources also take `Roles` and `Permissions`. Applications take `Sources`, the types they can
+is unique within the plugin, such as `"repository"`, and take a `Title`, a `Description`, `Inputs`,
+`Secrets` and `Outputs`. Resources also take `Roles` and `Permissions`. Applications take `Sources`, the types they can
 be deployed from: `"github"`, `"registry"`, `"s3"` or `"raw"`. The `Source` of an application arrives as
 `Type`, `Config` and `Ref`, where `Config` holds the settings of that type: `github` `{owner, name,
 branch?}`, `registry` `{image, tag?}`, `s3` `{bucket, key}` and `raw` `{path}`. `Ref` pins a commit, an
@@ -74,7 +75,15 @@ image digest or an object version, and is empty for the newest.
 ```
 
 `Type` is one of `TypeString`, `TypeNumber`, `TypeBoolean`, `TypeSelect`, `TypeList` (of strings) or
-`TypeMap`. Mark a credential `Sensitive: true` and it is never shown back once set.
+`TypeMap`. Mark an output `Sensitive: true` when it is a secret, such as a generated password, and it
+stays with the runner.
+
+**Secrets** are credentials, and are kept, sent and shown apart from inputs. Each has a `Name`, used as
+it is, a `Description` and whether it is `Required`. Its value is never shown back once set.
+
+```go
+&plugin.SecretDefinition{Name: "GITHUB_TOKEN", Description: "A token that can create repositories.", Required: true}
+```
 
 ## Access
 
@@ -153,12 +162,12 @@ A handler is `func(context.Context, *Request) (*Response, error)`, with the requ
 for the entity and the call: `ResourceProvisionRequest`, `ResourceProvisionResponse`. They are the
 generated contract messages, re-exported by the package so a plugin imports one thing.
 
-- **Getters are nil-safe.** Use `request.GetConfig().GetSecrets()["token"]`: anything the runner
+- **Getters are nil-safe.** Use `request.GetConfig().GetSecrets()["API_TOKEN"]`: anything the runner
   did not send reads as empty.
-- **Inputs.** `Config.Inputs` and `Inputs` hold the values that are not sensitive; call `.AsMap()`
-  on one for a plain `map[string]any` (numbers arrive as `float64`). Sensitive values arrive in
-  `Config.Secrets` (and a resource's or application's `Secrets`) as a `map[string]string`. Never
-  store them.
+- **Inputs and secrets.** `Config.Inputs` and `Inputs` hold the values of the inputs; call `.AsMap()`
+  on one for a plain `map[string]any` (numbers arrive as `float64`). The values of secrets arrive apart
+  from them, keyed by secret name, in `Config.Secrets` (and a resource's or application's `Secrets`)
+  as a `map[string]string`. Never store them.
 - **Open-ended values in a response**, such as `Outputs`, are built with `plugin.Struct(map[string]any{...})`,
   and an input's `Default` with `plugin.Value(...)`. They take what JSON can hold; anything else
   panics, which the SDK reports as an `INTERNAL` error with the stack on stderr, as it does for any
