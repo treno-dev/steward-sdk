@@ -1105,7 +1105,7 @@ func (x *ResourceDefinition) GetOutputs() []*OutputDefinition {
 // An application is deployable and has open-ended variables, which a resource has neither of. A
 // resource has fixed inputs and outputs that the plugin declares; an application also has a source
 // and variables whose names are chosen by the people who run it. Every declared application kind
-// can be deployed and has variables, so there is no capability list.
+// can be deployed and has variables.
 type ApplicationDefinition struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unique within the plugin, such as "laravel".
