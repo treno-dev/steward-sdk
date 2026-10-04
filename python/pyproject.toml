@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "treno-dev-steward-sdk"
-version = "0.1.0rc3"
+version = "0.1.0rc4"
 description = "The Steward SDK for Python: write Steward plugins"
 readme = "README.md"
 requires-python = ">=3.10"
