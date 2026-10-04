@@ -30,10 +30,10 @@ MAGIC_COOKIE_VALUE = "b6d7a1f2-steward-plugin"
 # The request of each handler, named for what it handles (the entity, then the call), for annotating
 # your own handlers. They are the generated messages: fields are snake_case, a message that was not
 # sent reads as empty, and a Struct (such as `inputs`) supports `[]`, `in` and `dict()`.
-IntegrationValidateRequest = contract.ValidateRequest
-IntegrationGrantAccessRequest = contract.IntegrationServiceGrantAccessRequest
-IntegrationRevokeAccessRequest = contract.IntegrationServiceRevokeAccessRequest
-IntegrationGetAccessRequest = contract.IntegrationServiceGetAccessRequest
+PluginValidateRequest = contract.ValidateRequest
+PluginGrantAccessRequest = contract.PluginServiceGrantAccessRequest
+PluginRevokeAccessRequest = contract.PluginServiceRevokeAccessRequest
+PluginGetAccessRequest = contract.PluginServiceGetAccessRequest
 ResourceProvisionRequest = contract.ResourceServiceProvisionRequest
 ResourceDeprovisionRequest = contract.ResourceServiceDeprovisionRequest
 ResourceListRequest = contract.ResourceServiceListRequest
@@ -48,10 +48,10 @@ ApplicationListRequest = contract.ApplicationServiceListRequest
 
 # A handler returns the generated response message, or a plain dict with the fields it has
 # something to say about (names may be snake_case or camelCase), or nothing at all.
-IntegrationValidateResponse = Union[contract.ValidateResponse, Mapping[str, Any], None]
-IntegrationGrantAccessResponse = Union[contract.IntegrationServiceGrantAccessResponse, Mapping[str, Any], None]
-IntegrationRevokeAccessResponse = Union[contract.IntegrationServiceRevokeAccessResponse, Mapping[str, Any], None]
-IntegrationGetAccessResponse = Union[contract.IntegrationServiceGetAccessResponse, Mapping[str, Any], None]
+PluginValidateResponse = Union[contract.ValidateResponse, Mapping[str, Any], None]
+PluginGrantAccessResponse = Union[contract.PluginServiceGrantAccessResponse, Mapping[str, Any], None]
+PluginRevokeAccessResponse = Union[contract.PluginServiceRevokeAccessResponse, Mapping[str, Any], None]
+PluginGetAccessResponse = Union[contract.PluginServiceGetAccessResponse, Mapping[str, Any], None]
 ResourceProvisionResponse = Union[contract.ResourceServiceProvisionResponse, Mapping[str, Any], None]
 ResourceDeprovisionResponse = Union[contract.ResourceServiceDeprovisionResponse, Mapping[str, Any], None]
 ResourceListResponse = Union[contract.ResourceServiceListResponse, Mapping[str, Any], None]
@@ -107,7 +107,7 @@ def _handlers(**calls: Handler | None) -> dict[str, Handler]:
 
 
 class Plugin:
-    """A plugin, which is one integration. Declare its resources, then call `serve()`."""
+    """A plugin. Declare its resources, then call `serve()`."""
 
     def __init__(self, name: str, version: str, definition: dict[str, Any], handlers: dict[str, Handler]) -> None:
         self.name = name
@@ -134,7 +134,7 @@ class Plugin:
         revoke_access: Handler | None = None,
         get_access: Handler | None = None,
     ) -> Plugin:
-        """Declares a kind of resource the integration manages, with its handlers."""
+        """Declares a kind of resource the plugin manages, with its handlers."""
         handlers = _handlers(
             provision=provision,
             deprovision=deprovision,
@@ -151,7 +151,6 @@ class Plugin:
             outputs=outputs,
             permissions=permissions,
             roles=roles,
-            capabilities=_resource_capabilities(handlers),
         )
         self.resources[kind] = _Kind(kind, definition, handlers)
 
@@ -172,7 +171,7 @@ class Plugin:
         set_variables: Handler | None = None,
         list: Handler | None = None,
     ) -> Plugin:
-        """Declares a kind of application the integration runs, with its handlers."""
+        """Declares a kind of application the plugin runs, with its handlers."""
         handlers = _handlers(create=create, delete=delete, deploy=deploy, set_variables=set_variables, list=list)
         definition = _defined(
             kind=kind,
@@ -187,16 +186,14 @@ class Plugin:
         return self
 
     def describe(self) -> contract.DescribeResponse:
-        access = any(call in self.handlers for call in ACCESS_CALLS)
-        integration = {
+        definition = {
             **self.definition,
-            "capabilities": ["INTEGRATION_CAPABILITY_ACCESS"] if access else [],
             "resources": [kind.definition for kind in self.resources.values()],
             "applications": [kind.definition for kind in self.applications.values()],
         }
 
         return json_format.ParseDict(
-            {"name": self.name, "version": self.version, "integration": integration},
+            {"name": self.name, "version": self.version, "definition": definition},
             contract.DescribeResponse(),
         )
 
@@ -228,7 +225,7 @@ def create_plugin(
     revoke_access: Handler | None = None,
     get_access: Handler | None = None,
 ) -> Plugin:
-    """Creates a plugin, which is one integration. Declare its resources, then call `serve()`."""
+    """Creates a plugin. Declare its resources, then call `serve()`."""
     definition = _defined(
         title=title,
         description=description,
@@ -244,21 +241,6 @@ def create_plugin(
     )
 
     return Plugin(name, version, definition, handlers)
-
-
-def _resource_capabilities(handlers: Mapping[str, Handler]) -> list[str]:
-    capabilities = []
-
-    if any(call in handlers for call in ACCESS_CALLS):
-        capabilities.append("RESOURCE_CAPABILITY_ACCESS")
-
-    if any(call in handlers for call in PROVISIONING_CALLS):
-        capabilities.append("RESOURCE_CAPABILITY_PROVISIONING")
-
-    if "list" in handlers:
-        capabilities.append("RESOURCE_CAPABILITY_DISCOVERY")
-
-    return capabilities
 
 
 # Serving --------------------------------------------------------------------------------------
@@ -321,7 +303,7 @@ def _route(plugin: Plugin, call: str, target: str) -> Callable[[Message], Awaita
 
 
 def _owner(plugin: Plugin, target: str, request: Message) -> Mapping[str, Handler]:
-    if target == "integration":
+    if target == "plugin":
         return plugin.handlers
 
     kinds = plugin.resources if target == "resource" else plugin.applications
@@ -406,16 +388,17 @@ async def _serve(plugin: Plugin) -> None:
     async def describe(_request: Message) -> Message:
         return plugin.describe()
 
-    # Every plugin must answer Validate; without a handler of its own, every integration is accepted.
+    # Every plugin must answer Validate; without a handler of its own, every config is accepted.
     async def accept(_request: Message) -> None:
         return None
 
-    validate = _route(plugin, "validate", "integration") if "validate" in plugin.handlers else accept
+    validate = _route(plugin, "validate", "plugin") if "validate" in plugin.handlers else accept
 
-    _register(server, "PluginService", {"describe": describe, "validate": validate})
-
-    if any(call in plugin.handlers for call in ACCESS_CALLS):
-        _register(server, "IntegrationService", _routes(plugin, ACCESS_CALLS, "integration"))
+    _register(
+        server,
+        "PluginService",
+        {"describe": describe, "validate": validate, **_routes(plugin, ACCESS_CALLS, "plugin")},
+    )
 
     if plugin.resources:
         _register(server, "ResourceService", _routes(plugin, RESOURCE_CALLS, "resource"))

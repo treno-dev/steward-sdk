@@ -8,11 +8,10 @@ see ../proto) and the functions a plugin writes.
     plugin.resource(kind="repository", inputs=[...], provision=provision, deprovision=deprovision)
     plugin.serve()
 
-A plugin is one integration, like a provider. It declares that integration and each of its resource
-or application kinds once, with the handlers attached. The SDK routes every call to the right
-handler by kind, builds the description Steward asks for (including each kind's capabilities, which
-follow from the handlers it has), serves the gRPC services, prints the handshake line, answers the
-health check, and answers any call without a handler with UNIMPLEMENTED.
+A plugin declares itself and each of its resource or application kinds once, with the handlers
+attached. The SDK routes every call to the right handler by kind, builds the description Steward asks
+for, serves the gRPC services, prints the handshake line, answers the health check, and answers any
+call without a handler with UNIMPLEMENTED.
 
 Everything a plugin logs must go to stderr: stdout is reserved for the handshake line.
 """
@@ -29,16 +28,16 @@ from steward_sdk.plugin._plugin import (
     ApplicationListResponse,
     ApplicationSetVariablesRequest,
     ApplicationSetVariablesResponse,
-    IntegrationGetAccessRequest,
-    IntegrationGetAccessResponse,
-    IntegrationGrantAccessRequest,
-    IntegrationGrantAccessResponse,
-    IntegrationRevokeAccessRequest,
-    IntegrationRevokeAccessResponse,
-    IntegrationValidateRequest,
-    IntegrationValidateResponse,
     Plugin,
     PluginError,
+    PluginGetAccessRequest,
+    PluginGetAccessResponse,
+    PluginGrantAccessRequest,
+    PluginGrantAccessResponse,
+    PluginRevokeAccessRequest,
+    PluginRevokeAccessResponse,
+    PluginValidateRequest,
+    PluginValidateResponse,
     ResourceDeprovisionRequest,
     ResourceDeprovisionResponse,
     ResourceGetAccessRequest,
@@ -67,16 +66,16 @@ __all__ = [
     "ApplicationListResponse",
     "ApplicationSetVariablesRequest",
     "ApplicationSetVariablesResponse",
-    "IntegrationGetAccessRequest",
-    "IntegrationGetAccessResponse",
-    "IntegrationGrantAccessRequest",
-    "IntegrationGrantAccessResponse",
-    "IntegrationRevokeAccessRequest",
-    "IntegrationRevokeAccessResponse",
-    "IntegrationValidateRequest",
-    "IntegrationValidateResponse",
     "Plugin",
     "PluginError",
+    "PluginGetAccessRequest",
+    "PluginGetAccessResponse",
+    "PluginGrantAccessRequest",
+    "PluginGrantAccessResponse",
+    "PluginRevokeAccessRequest",
+    "PluginRevokeAccessResponse",
+    "PluginValidateRequest",
+    "PluginValidateResponse",
     "ResourceDeprovisionRequest",
     "ResourceDeprovisionResponse",
     "ResourceGetAccessRequest",

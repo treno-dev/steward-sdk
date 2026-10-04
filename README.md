@@ -40,8 +40,8 @@ A **plugin** is a small program that teaches Steward one external system. It is 
 Steward's questions and that system's API. The GitHub plugin, for example:
 
 - **declares what it needs to connect:** the GitHub organization and an access token. Steward shows
-  these as a form when someone connects GitHub, and calls each connection an **integration**. A
-  company can have several integrations from one plugin, such as two GitHub organizations.
+  these as a form when someone adds the plugin. A company can add the same plugin several times, such
+  as for two GitHub organizations, each with its own settings and credentials.
 - **declares what it manages:** kinds of **resources**, such as `repository`, each with the settings it
   takes to create one (visibility, description) and what it reports back once it exists (its URL).
 - **declares what can be granted:** the roles and permissions GitHub offers, such as `read`, `write`
@@ -59,9 +59,9 @@ Those calls fall into three kinds of work. A plugin supports whichever fit its s
 - **Access:** grant, revoke and report someone's roles, on the system as a whole (membership of the
   GitHub organization) or on one resource (a role on one repository).
 
-The plugin declares which of these it supports, for the system as a whole and for each kind of
-resource, and Steward offers only that. The list is designed to grow: new kinds of work are added to
-the contract beside these without breaking plugins that already exist.
+A plugin supports whichever it implements, for the system as a whole and for each kind of resource,
+and Steward offers only that. The list is designed to grow: new kinds of work are added to the
+contract beside these without breaking plugins that already exist.
 
 ### Everything is extensible through plugins
 
@@ -109,7 +109,7 @@ the record of it, and works out what changed. The plugin is told what to do, doe
 3. **The contract is a protobuf file.** [`proto/steward/plugin/v1/plugin.proto`](proto/steward/plugin/v1/plugin.proto)
    defines every message and call. The SDKs are generated from it, so they all behave the same way.
    Within `v1` the contract only grows.
-4. **The SDK hides the protocol.** You declare the integration and its kinds of resources, and write
+4. **The SDK hides the protocol.** You declare the plugin and its kinds of resources, and write
    one function per call. The SDK serves gRPC, prints the handshake, answers the health check, routes
    each call to your function by kind, and answers anything you did not write with `UNIMPLEMENTED`.
 
@@ -121,8 +121,8 @@ so a plugin can be written in any language that can serve gRPC. A program is a S
 
 1. **prints the handshake line** on stdout once it is listening, `1|1|unix|<socket path>|grpc` (or
    `1|1|tcp|127.0.0.1:<port>|grpc`);
-2. **serves the services of the contract**: `PluginService` always, and `IntegrationService`,
-   `ResourceService` and `ApplicationService` for what it supports, generated from
+2. **serves the services of the contract**: `PluginService` always, and `ResourceService` and
+   `ApplicationService` for what it supports, generated from
    [the proto](proto/steward/plugin/v1/plugin.proto) with `protoc` or `buf` in your language; and
 3. **serves the standard gRPC health service**, reporting `SERVING` for the service named `plugin`.
 
@@ -146,21 +146,22 @@ road, and a plugin in Rust, Java or anything else is the same contract without t
 
 ### The pieces of a plugin
 
-- **An integration**: one connection to the tool. It declares its **inputs**, like variables with a
-  name and a type. Credentials are inputs marked `sensitive`, and the runner passes them to each call
+- **A config**: what the plugin is set up with. It declares its **inputs**, like variables with a name
+  and a type. Credentials are inputs marked `sensitive`, and the runner passes them to each call
   separately so the plugin never has to store them.
 - **Resources**: the things the tool holds, each declared once under a **kind** (`"repository"`) with
   its own inputs and **outputs** (what comes back once it exists, such as a URL). A resource is
   identified by its kind and name.
-- **Access**: roles and permissions that can be granted on the integration as a whole, or on one
-  resource. A plugin declares what the tool offers, and Steward can build custom roles from the
-  permissions.
+- **Access**: roles and permissions that can be granted on the plugin as a whole, or on one resource.
+  They are two separate lists: the **roles** the tool defines itself, and the **permissions** Steward
+  builds its own roles from. Declaring either says access is supported.
 - **Applications** (optional): things that are deployed from a source and have open-ended variables,
   as opposed to resources, which are provisioned.
 
-Capabilities are never listed. The SDK reads them from the functions you wrote: with `provision` and
-`deprovision` a kind can be created and removed, with `grantAccess`, `revokeAccess` and `getAccess` it
-can have access granted, with `list` it can be discovered.
+Nothing lists what a kind can do. Steward calls, and a call for a function you did not write answers
+`UNIMPLEMENTED`, which means it is not offered: with `provision` and `deprovision` a kind can be
+created and removed, with `list` it can be discovered, and with roles or permissions and the access
+functions it can have access granted.
 
 Calls that change something are **idempotent** and return the **result** (the outputs, the role as the
 tool applied it), not a report of what changed. Steward works out the difference itself.
@@ -180,7 +181,7 @@ is [`templates/js/src/plugin.js.tmpl`](templates/js/src/plugin.js.tmpl).
 ```js
 import { createPlugin } from "@treno-dev/steward-sdk/plugin";
 
-// The integration: what it takes to connect to the tool.
+// The plugin: what it takes to connect to the tool.
 const plugin = createPlugin({
   name: "my-plugin",
   version: "0.1.0",
@@ -198,10 +199,10 @@ const plugin = createPlugin({
   ],
 
   // Return an error for each input the user can fix.
-  async validate({ integration }) {
+  async validate({ config }) {
     const errors = [];
 
-    if (!integration.secrets.token) {
+    if (!config.secrets.token) {
       errors.push({ field: "token", message: "An API token is required." });
     }
 
@@ -214,31 +215,36 @@ plugin.resource({
   kind: "item",
   title: "Item",
   outputs: [{ name: "url", label: "URL", type: "string" }],
+  permissions: [
+    { name: "view", title: "View" },
+    { name: "edit", title: "Edit" },
+  ],
   roles: [
-    { name: "read", title: "Read" },
-    { name: "write", title: "Write" },
+    { name: "viewer", title: "Viewer" },
+    { name: "editor", title: "Editor" },
   ],
 
   // Create the resource. Idempotent. Return what it produced.
-  async provision({ integration, name }) {
-    return { outputs: { url: `${integration.inputs.base_url}/items/${name}` } };
+  async provision({ config, name }) {
+    return { outputs: { url: `${config.inputs.base_url}/items/${name}` } };
   },
 
   async deprovision({ resource }) {
     return {};
   },
 
-  // Give an identity a role on the resource. Return the role as the tool applied it.
-  async grantAccess({ identity, role }) {
-    return { role };
+  // Give an identity a role on the resource. The role is always set, and `permissions` lists the pieces
+  // of a role Steward composed. Return what the tool applied.
+  async grantAccess({ identity, role, permissions }) {
+    return { role, permissions };
   },
 
-  async revokeAccess({ identity, role }) {
+  async revokeAccess({ identity, role, permissions }) {
     return {};
   },
 
   async getAccess({ identity }) {
-    return { roles: [], pending: false };
+    return { roles: [], permissions: [], pending: false };
   },
 });
 
@@ -261,9 +267,9 @@ The other languages follow the same shape, in their own idiom:
 
 | Language               | Install                                      | Declare                                                 | A handler                                        |
 | ---------------------- | -------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------ |
-| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk`         | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ integration, name }) { ... }` |
+| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk`         | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ config, name }) { ... }`      |
 | Python                 | `pip install treno-dev-steward-sdk`          | `create_plugin(...)`, `plugin.resource(kind=..., ...)`  | `async def provision(request): ...`              |
-| Go                     | `go get github.com/treno-dev/steward-sdk/go` | `plugin.New(...)`, `integration.Resource("kind", ...)`  | `func(ctx, *Request) (*Response, error)`         |
+| Go                     | `go get github.com/treno-dev/steward-sdk/go` | `plugin.New(...)`, `p.Resource("kind", ...)`            | `func(ctx, *Request) (*Response, error)`         |
 
 Each is one SDK package per language, and the plugin code is its `plugin` part: `@treno-dev/steward-sdk/plugin`
 in JavaScript, `steward_sdk.plugin` in Python and `…/go/plugin` in Go. Other parts of the SDK will sit
@@ -323,30 +329,28 @@ steward plugin validate .venv/bin/python src/plugin.py
 steward plugin validate go run .
 ```
 
-```sh
-steward plugin validate node src/plugin.js
-steward plugin validate .venv/bin/python src/plugin.py
-steward plugin validate go run .
 ```
-
-```
-✓ handshake           tcp 127.0.0.1:50984, contract version 1
-✓ health              the service "plugin" is SERVING
-✓ describe            my-plugin 0.1.0: 1 resource kind(s) (item), 0 application kind(s)
-✓ inputs              every input and output has a name and a known type
-✓ item access         declared, and GetAccess is served
-✓ standard output     only the handshake line
+✓ handshake       unix /tmp/steward-2871798330/plugin-4855f4bd, contract version 1
+✓ health          the service "plugin" is SERVING
+✓ describe        my-plugin 0.1.0: 1 resource kind(s) (item), 0 application kind(s)
+✓ inputs          every input and output has a name and a known type
+✓ kinds           kinds are named and unique
+✓ roles           roles and permissions are named and unique
+✓ validate        answered, and the inputs are good
+✓ plugin access   not declared, and GetAccess is UNIMPLEMENTED
+✓ item access     declared, and GetAccess is served
+✓ item discovery  List is not offered
 ```
 
 It only reads: it checks the handshake, the health service, what the plugin describes about itself, that
-`Validate` answers, that each kind serves access and discovery exactly when it declares them, and that
-nothing but the handshake line goes to standard output. It never creates or changes anything, so it is
-safe to run against real credentials.
+`Validate` answers, that the plugin and each kind serve access exactly when they declare roles or
+permissions, and which kinds offer discovery. It never creates or changes anything, so it is safe to
+run against real credentials.
 
 ### Run
 
 `steward plugin run` invokes the plugin with a context file saying what to use. It gives the identity a
-role on the integration, then for each resource in the context creates it, gives the identity a role on
+role on the plugin, then for each resource in the context creates it, gives the identity a role on
 it and takes the role away, and removes it. It removes what it created even when a step fails.
 
 It does all of this for real, in whatever the plugin's credentials reach, so point it at a test account.
@@ -362,7 +366,7 @@ To work on one call at a time, name it with `--call`. It makes only that call, o
 the context, prints what the plugin answered, and cleans nothing up, since leaving what a call made in
 place is the point. The calls are `provision`, `grant-access`, `get-access`, `revoke-access` and
 `deprovision`. Repeat the flag, or separate names with commas, to make several, and they run in lifecycle
-order. The access calls also run against the integration when it declares access.
+order. The access calls also run against the plugin when it declares roles or permissions.
 
 ```sh
 steward plugin run --context context.json --call provision node src/plugin.js
@@ -372,19 +376,19 @@ steward plugin run --context context.json --call grant-access --call get-access 
 steward plugin run --context context.json --call deprovision node src/plugin.js
 ```
 
-A call a kind doesn't declare, such as `grant-access` on a kind without access, is skipped. Responses are
+A call a kind doesn't offer, such as `grant-access` on a kind without access, is skipped. Responses are
 printed as they come, so outputs marked sensitive show in your terminal as well.
 
 ### The context file
 
 ```json
 {
-  "integration": {
+  "config": {
     "inputs": { "base_url": "https://example.test" },
     "secrets": { "token": "..." }
   },
   "identity": { "external_id": "someone" },
-  "role": { "name": "read" },
+  "role": { "name": "viewer", "permissions": [{ "name": "view" }] },
   "resources": [
     { "kind": "item", "name": "demo", "inputs": { "description": "a test item" } },
     { "kind": "item", "name": "second" }
@@ -392,14 +396,15 @@ printed as they come, so outputs marked sensitive show in your terminal as well.
 }
 ```
 
-- **`integration`** holds the connection values the plugin is invoked with, as an integration would supply
-  them: its inputs and its secrets.
+- **`config`** holds the values the plugin is invoked with, as Steward would supply them: its inputs and
+  its secrets.
 - **`resources`** is a list of the requests that create resources. Each has a `kind` the plugin declares, a
   `name`, and the `inputs` and `secrets` of that kind. They run in the order listed, and you can list
   several of the same kind. Each `kind` and `name` pair can appear once.
-- **`identity`** and **`role`** are who is given which role, on the integration and on each resource.
+- **`identity`** and **`role`** are who is given which role, on the plugin and on each resource. The role
+  is always named. Its `permissions` are only for a role Steward composed from the plugin's permissions.
 
-`run` needs the file. `validate` can take it too, with `--context`, to give the integration the read-only
+`run` needs the file. `validate` can take it too, with `--context`, to give the plugin the config the read-only
 calls are made with. Both commands exit with a failure when a check fails, so they can run in CI, and
 `--verbose` shows what the plugin writes to standard error.
 

@@ -41,10 +41,6 @@ func (g *grpcPlugin) GRPCServer(_ *goplugin.GRPCBroker, server *grpc.Server) err
 
 	pluginv1.RegisterPluginServiceServer(server, pluginService{plugin: p})
 
-	if p.hasIntegrationAccess() {
-		pluginv1.RegisterIntegrationServiceServer(server, integrationService{plugin: p})
-	}
-
 	if len(p.resources) > 0 {
 		pluginv1.RegisterResourceServiceServer(server, resourceService{plugin: p})
 	}
@@ -80,7 +76,7 @@ func recoverPanics(ctx context.Context, request any, _ *grpc.UnaryServerInfo, ha
 	return handler(ctx, request)
 }
 
-// The services route each call to the handler of the same name on the integration or on the kind the
+// The services route each call to the handler of the same name on the plugin or on the kind the
 // request is about, and answer a call without a handler with UNIMPLEMENTED. The generated Unimplemented
 // servers keep the plugin compatible when the contract gains calls.
 
@@ -93,39 +89,34 @@ func (s pluginService) Describe(context.Context, *pluginv1.DescribeRequest) (*pl
 	return s.plugin.describe(), nil
 }
 
-func (s pluginService) Validate(ctx context.Context, request *IntegrationValidateRequest) (*IntegrationValidateResponse, error) {
-	// Every plugin must answer Validate; without a handler of its own, every integration is accepted.
+func (s pluginService) Validate(ctx context.Context, request *PluginValidateRequest) (*PluginValidateResponse, error) {
+	// Every plugin must answer Validate; without a handler of its own, every config is accepted.
 	if s.plugin.options.Validate == nil {
-		return &IntegrationValidateResponse{}, nil
+		return &PluginValidateResponse{}, nil
 	}
 
 	return s.plugin.options.Validate(ctx, request)
 }
 
-type integrationService struct {
-	pluginv1.UnimplementedIntegrationServiceServer
-	plugin *Plugin
-}
-
-func (s integrationService) GrantAccess(ctx context.Context, request *IntegrationGrantAccessRequest) (*IntegrationGrantAccessResponse, error) {
+func (s pluginService) GrantAccess(ctx context.Context, request *PluginGrantAccessRequest) (*PluginGrantAccessResponse, error) {
 	if s.plugin.options.GrantAccess == nil {
-		return nil, unimplemented("grant_access", "integration")
+		return nil, unimplemented("grant_access", "plugin")
 	}
 
 	return s.plugin.options.GrantAccess(ctx, request)
 }
 
-func (s integrationService) RevokeAccess(ctx context.Context, request *IntegrationRevokeAccessRequest) (*IntegrationRevokeAccessResponse, error) {
+func (s pluginService) RevokeAccess(ctx context.Context, request *PluginRevokeAccessRequest) (*PluginRevokeAccessResponse, error) {
 	if s.plugin.options.RevokeAccess == nil {
-		return nil, unimplemented("revoke_access", "integration")
+		return nil, unimplemented("revoke_access", "plugin")
 	}
 
 	return s.plugin.options.RevokeAccess(ctx, request)
 }
 
-func (s integrationService) GetAccess(ctx context.Context, request *IntegrationGetAccessRequest) (*IntegrationGetAccessResponse, error) {
+func (s pluginService) GetAccess(ctx context.Context, request *PluginGetAccessRequest) (*PluginGetAccessResponse, error) {
 	if s.plugin.options.GetAccess == nil {
-		return nil, unimplemented("get_access", "integration")
+		return nil, unimplemented("get_access", "plugin")
 	}
 
 	return s.plugin.options.GetAccess(ctx, request)

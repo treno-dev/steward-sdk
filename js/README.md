@@ -1,10 +1,10 @@
 # @treno-dev/steward-sdk
 
 The Steward SDK for JavaScript and TypeScript. Today it holds the part for writing Steward plugins,
-imported from `@treno-dev/steward-sdk/plugin`. A plugin is one integration: it declares what it needs
-to connect to a system and what it manages there, and implements the calls Steward makes. The SDK
-handles everything else: the gRPC services, the handshake with the runner, the health check, and
-routing each call to your handler by kind.
+imported from `@treno-dev/steward-sdk/plugin`. A plugin declares what it needs to connect to the tools
+it works with and what it manages there, and implements the calls Steward makes. The SDK handles
+everything else: the gRPC services, the handshake with the runner, the health check, and routing each
+call to your handler by kind.
 
 ```sh
 npm install @treno-dev/steward-sdk
@@ -53,8 +53,8 @@ plugin.resource({
   kind: 'item',
   outputs: [{ name: 'url', label: 'URL', type: 'string' }],
 
-  async provision({ integration, name }) {
-    return { outputs: { url: `${integration.inputs.base_url}/items/${name}` } };
+  async provision({ config, name }) {
+    return { outputs: { url: `${config.inputs.base_url}/items/${name}` } };
   },
 
   async deprovision({ resource }) {
@@ -71,15 +71,15 @@ for example both Cloudflare and AWS, take the credentials for each as inputs.
 
 ## What you declare
 
-**The integration**, in `createPlugin`:
+**The plugin**, in `createPlugin`:
 
 | Option | |
 |---|---|
 | `name`, `version` | Required. |
 | `title`, `description` | Shown in Steward. |
-| `inputs` | What is required to create an integration, credentials included. |
-| `validate` | Optional. Checks the credentials, which Steward cannot. Returns `{ errors: [{ field, message }] }`. Without it, every integration is accepted. |
-| `roles`, `permissions`, `grantAccess`, `revokeAccess`, `getAccess` | Access to the integration as a whole, such as membership of an organization. |
+| `inputs` | What is required to configure the plugin, credentials included. |
+| `validate` | Optional. Checks the credentials, which Steward cannot. Returns `{ errors: [{ field, message }] }`. Without it, every config is accepted. |
+| `roles`, `permissions`, `grantAccess`, `revokeAccess`, `getAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
 **A resource**, with `plugin.resource({ kind, ... })`, and **an application**, with
 `plugin.application({ kind, ... })`, both have a `kind` that is unique within the plugin, a `title`,
@@ -103,12 +103,12 @@ credential `sensitive: true` and it is never shown back once set.
 Access exists at two levels, each with the same three handlers, `grantAccess`, `revokeAccess` and
 `getAccess`:
 
-- **The integration**, in `createPlugin`: membership of the tool as a whole, such as an organization
-  or a site. Steward grants this first, then access to the resources.
+- **The plugin**, in `createPlugin`: membership of the tool as a whole, such as an organization or a
+  site. Steward grants this first, then access to the resources.
 - **A resource kind**, in `plugin.resource`: a role on one resource, such as a repository. The
   generated plugin above shows this.
 
-For the integration it looks like this:
+For the plugin it looks like this:
 
 ```js
 const plugin = createPlugin({
@@ -118,18 +118,18 @@ const plugin = createPlugin({
 
   roles: [{ name: 'member', title: 'Member' }, { name: 'owner', title: 'Owner' }],
 
-  grantAccess: async ({ integration, identity, role }) => {
-    const invitation = await invite(integration, identity.externalId || identity.attrs.email, role.name);
+  grantAccess: async ({ config, identity, role }) => {
+    const invitation = await invite(config, identity.externalId || identity.attrs.email, role.name);
 
     return { id: invitation.id, role, pending: true }; // an invitation is not access until accepted
   },
-  revokeAccess: async ({ integration, identity }) => {
-    await removeFromOrganization(integration, identity.externalId);
+  revokeAccess: async ({ config, identity }) => {
+    await removeFromOrganization(config, identity.externalId);
 
     return {};
   },
-  getAccess: async ({ integration, identity }) => {
-    const membership = await findMembership(integration, identity);
+  getAccess: async ({ config, identity }) => {
+    const membership = await findMembership(config, identity);
 
     return { roles: membership ? [{ name: membership.role }] : [], pending: Boolean(membership?.pending) };
   },
@@ -138,35 +138,40 @@ const plugin = createPlugin({
 
 `invite`, `removeFromOrganization` and `findMembership` stand for calls to the tool's own API.
 
-What you declare with `roles` (and, for tools that expose them, `permissions`) is what Steward offers
-for assignment. A role has a `name` and the `permissions` it contains, and a permission is a `name`
-with an optional `level`: `{ name: 'pull_requests', level: 'read' }`, or just `{ name: 's3:GetObject' }`.
-Steward can also build its own roles from the permissions you declare.
+Declaring `roles` or `permissions` is what says that the plugin, or the kind, supports access. They are
+two separate lists:
+
+- **`roles`** are the ones the tool defines itself, each with a `name`, `title` and `description`.
+- **`permissions`** are the pieces Steward builds its own roles from. A permission is a `name` with an
+  optional `level`: `{ name: 'pull_requests', level: 'read' }`, or just `{ name: 's3:GetObject' }`.
 
 Handlers receive the `identity` (`externalId`, `name`, `attrs`) and the `role` to apply, and a resource
-call also gets the `resource` (`kind`, `name`). They return:
+call also gets the `resource` (`kind`, `name`). The `role` is always set. For a role Steward composed
+from your permissions, `permissions` lists its pieces too, for you to apply as far as the tool allows.
+They return:
 
-- `grantAccess`: the `role` as the tool applied it, which may differ from the one requested, an `id`
-  for the grant if the tool has one (Steward sends it back on revoke), and `pending: true` while the
-  person has to act first, such as accepting an invitation.
+- `grantAccess`: the `role` and `permissions` as the tool applied them, which may differ from what was
+  requested, an `id` for the grant if the tool has one (Steward sends it back on revoke), and
+  `pending: true` while the person has to act first, such as accepting an invitation.
 - `revokeAccess`: nothing. It succeeds if the identity did not have the role.
-- `getAccess`: the `roles` the identity holds now, and whether a grant is still `pending`.
+- `getAccess`: the `roles` and `permissions` the identity holds now, and whether a grant is still
+  `pending`.
 
 Steward works out overlap between roles before it asks you to revoke one, so you can remove the role
 you are given in full.
 
-## Capabilities follow from your handlers
+## What you write is what is offered
 
-You never list capabilities. The SDK reads them from the handlers you write:
+You never list what a kind can do. Steward calls, and a call for something you did not write fails
+with `UNIMPLEMENTED`, which means it is not offered. The one thing you declare is access: roles or
+permissions say that it is supported.
 
 | You write | The kind can |
 |---|---|
-| `provision`, `deprovision` | be created and removed (provisioning) |
+| `provision`, `deprovision` | be created and removed |
 | `list` | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
-| `grantAccess`, `revokeAccess`, `getAccess` | have access granted (resources and the integration) |
+| `roles` or `permissions`, with `grantAccess`, `revokeAccess`, `getAccess` | have access granted (resources and the plugin) |
 | `create`, `delete`, `deploy`, `setVariables`, `list` | be run as an application |
-
-A call for something you did not write fails with `UNIMPLEMENTED`.
 
 ## Handlers
 
@@ -174,8 +179,8 @@ A handler receives the request as a plain object and returns the response as one
 any field it has nothing to say about. Field names are camelCase. In TypeScript, requests and
 responses are typed from the contract.
 
-- **Inputs.** `integration.inputs` and `inputs` hold the values that are not sensitive, keyed by
-  input name. Sensitive values arrive in `integration.secrets` (and a resource's or application's
+- **Inputs.** `config.inputs` and `inputs` hold the values that are not sensitive, keyed by
+  input name. Sensitive values arrive in `config.secrets` (and a resource's or application's
   `secrets`). Never store them. The SDK always provides these objects, empty if nothing was set.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating
   what exists, or removing what is gone, simply succeeds. Return the result of the change (the
@@ -185,8 +190,9 @@ responses are typed from the contract.
   stores and sends on every later call. `provision` receives them with the `inputs` and returns only
   the `outputs`, such as a URL or an id the tool assigned. An identity has
   `externalId`, `name`, `ulid` and `attrs`.
-- **Access.** A grant returns the `role` as the tool applied it, an `id` for the grant if the tool
-  has one, and `pending: true` while it needs the person to act, such as accepting an invitation.
+- **Access.** A grant returns the `role` and `permissions` as the tool applied them, an `id` for the
+  grant if the tool has one, and `pending: true` while it needs the person to act, such as accepting
+  an invitation.
 - **Variables.** An application's variables each carry `sensitive`, `sealed` and `locked`. Refuse to
   change or remove a locked variable.
 

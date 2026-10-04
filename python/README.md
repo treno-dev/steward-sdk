@@ -1,10 +1,10 @@
 # treno-dev-steward-sdk
 
 The Steward SDK for Python. Today it holds the part for writing Steward plugins, imported from
-`steward_sdk.plugin`. A plugin is one integration: it declares what it needs to connect to a system and
-what it manages there, and implements the calls Steward makes. The SDK handles everything else: the
-gRPC services, the handshake with the runner, the health check, and routing each call to your handler
-by kind.
+`steward_sdk.plugin`. A plugin declares what it needs to connect to the tools it works with and what it
+manages there, and implements the calls Steward makes. The SDK handles everything else: the gRPC
+services, the handshake with the runner, the health check, and routing each call to your handler by
+kind.
 
 ```sh
 pip install treno-dev-steward-sdk
@@ -42,7 +42,7 @@ from steward_sdk.plugin import create_plugin
 
 
 async def provision(request):
-    base_url = request.integration.inputs["base_url"]
+    base_url = request.config.inputs["base_url"]
 
     return {"outputs": {"url": f"{base_url}/items/{request.name}"}}
 
@@ -76,15 +76,15 @@ for example both Cloudflare and AWS, take the credentials for each as inputs.
 
 ## What you declare
 
-**The integration**, in `create_plugin`:
+**The plugin**, in `create_plugin`:
 
-| Argument                                                              |                                                                                                                                                            |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`, `version`                                                     | Required.                                                                                                                                                  |
-| `title`, `description`                                                | Shown in Steward.                                                                                                                                          |
-| `inputs`                                                              | What is required to create an integration, credentials included.                                                                                           |
-| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every integration is accepted. |
-| `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the integration as a whole, such as membership of an organization.                                                                               |
+| Argument                                                              |                                                                                                                                                      |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`, `version`                                                     | Required.                                                                                                                                            |
+| `title`, `description`                                                | Shown in Steward.                                                                                                                                    |
+| `inputs`                                                              | What is required to configure the plugin, credentials included.                                                                                      |
+| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every config is accepted. |
+| `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the plugin as a whole, such as membership of an organization.                                                                              |
 
 **A resource**, with `plugin.resource(kind=..., ...)`, and **an application**, with
 `plugin.application(kind=..., ...)`, both have a `kind` that is unique within the plugin, a `title`, a
@@ -108,18 +108,18 @@ credential `"sensitive": True` and it is never shown back once set.
 Access exists at two levels, each with the same three handlers, `grant_access`, `revoke_access` and
 `get_access`:
 
-- **The integration**, in `create_plugin`: membership of the tool as a whole, such as an organization
-  or a site. Steward grants this first, then access to the resources.
+- **The plugin**, in `create_plugin`: membership of the tool as a whole, such as an organization or a
+  site. Steward grants this first, then access to the resources.
 - **A resource kind**, in `plugin.resource`: a role on one resource, such as a repository. The
   generated plugin above shows this.
 
-For the integration it looks like this:
+For the plugin it looks like this:
 
 ```python
-async def grant_access(request: IntegrationGrantAccessRequest) -> IntegrationGrantAccessResponse:
+async def grant_access(request: PluginGrantAccessRequest) -> PluginGrantAccessResponse:
     identity = request.identity
     email = identity.external_id or plain(identity.attrs)["email"]
-    invitation = await invite(request.integration, email, request.role.name)
+    invitation = await invite(request.config, email, request.role.name)
 
     return {"id": invitation.id, "role": request.role, "pending": True}  # an invitation is not access until accepted
 
@@ -137,35 +137,40 @@ plugin = create_plugin(
 
 `invite` stands for a call to the tool's own API.
 
-What you declare with `roles` (and, for tools that expose them, `permissions`) is what Steward offers
-for assignment. A role has a `name` and the `permissions` it contains, and a permission is a `name`
-with an optional `level`: `{"name": "pull_requests", "level": "read"}`, or just `{"name": "s3:GetObject"}`.
-Steward can also build its own roles from the permissions you declare.
+Declaring `roles` or `permissions` is what says that the plugin, or the kind, supports access. They are
+two separate lists:
+
+- **`roles`** are the ones the tool defines itself, each with a `name`, `title` and `description`.
+- **`permissions`** are the pieces Steward builds its own roles from. A permission is a `name` with an
+  optional `level`: `{"name": "pull_requests", "level": "read"}`, or just `{"name": "s3:GetObject"}`.
 
 Handlers receive the `identity` (`external_id`, `name`, `attrs`) and the `role` to apply, and a resource
-call also gets the `resource` (`kind`, `name`). They return:
+call also gets the `resource` (`kind`, `name`). The `role` is always set. For a role Steward composed
+from your permissions, `permissions` lists its pieces too, for you to apply as far as the tool allows.
+They return:
 
-- `grant_access`: the `role` as the tool applied it, which may differ from the one requested, an `id`
-  for the grant if the tool has one (Steward sends it back on revoke), and `pending: True` while the
-  person has to act first, such as accepting an invitation.
+- `grant_access`: the `role` and `permissions` as the tool applied them, which may differ from what was
+  requested, an `id` for the grant if the tool has one (Steward sends it back on revoke), and
+  `pending: True` while the person has to act first, such as accepting an invitation.
 - `revoke_access`: nothing. It succeeds if the identity did not have the role.
-- `get_access`: the `roles` the identity holds now, and whether a grant is still `pending`.
+- `get_access`: the `roles` and `permissions` the identity holds now, and whether a grant is still
+  `pending`.
 
 Steward works out overlap between roles before it asks you to revoke one, so you can remove the role
 you are given in full.
 
-## Capabilities follow from your handlers
+## What you pass is what is offered
 
-You never list capabilities. The SDK reads them from the handlers you pass:
+You never list what a kind can do. Steward calls, and a call for something you did not pass fails with
+`UNIMPLEMENTED`, which means it is not offered. The one thing you declare is access: roles or
+permissions say that it is supported.
 
-| You pass                                              | The kind can                                                                                                                 |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `provision`, `deprovision`                            | be created and removed (provisioning)                                                                                        |
-| `list`                                                | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
-| `grant_access`, `revoke_access`, `get_access`         | have access granted (resources and the integration)                                                                          |
-| `create`, `delete`, `deploy`, `set_variables`, `list` | be run as an application                                                                                                     |
-
-A call for something you did not pass fails with `UNIMPLEMENTED`.
+| You pass                                                       | The kind can                                                                                                                 |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `provision`, `deprovision`                                     | be created and removed                                                                                                       |
+| `list`                                                         | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
+| `roles` or `permissions`, with `grant_access`, `revoke_access`, `get_access` | have access granted (resources and the plugin)                                                                 |
+| `create`, `delete`, `deploy`, `set_variables`, `list`          | be run as an application                                                                                                     |
 
 ## Handlers
 
@@ -178,8 +183,8 @@ plain one runs in a thread, so blocking calls do not stall the plugin).
 - **Responses** are a response message or a plain dict with the fields you have something to say
   about (snake_case or camelCase). Messages inside it, such as the `role` you were given, can be used
   as they are. Returning nothing is an empty response.
-- **Inputs.** `integration.inputs` and `inputs` hold the values that are not sensitive, keyed by input
-  name; numbers arrive as floats. Sensitive values arrive in `integration.secrets` (and a resource's or
+- **Inputs.** `config.inputs` and `inputs` hold the values that are not sensitive, keyed by input
+  name; numbers arrive as floats. Sensitive values arrive in `config.secrets` (and a resource's or
   application's `secrets`), a plain `dict`-like of strings. Never store them.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating what
   exists, or removing what is gone, simply succeeds. Return the result of the change (the `outputs`,

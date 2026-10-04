@@ -1,8 +1,8 @@
 # Steward SDK for Go
 
 The Steward SDK for Go. Today it holds the part for writing Steward plugins, in the package
-`github.com/treno-dev/steward-sdk/go/plugin`. A plugin is one integration: it declares what it needs to
-connect to a system and what it manages there, and implements the calls Steward makes. The SDK handles
+`github.com/treno-dev/steward-sdk/go/plugin`. A plugin declares what it needs to connect to the tools it
+works with and what it manages there, and implements the calls Steward makes. The SDK handles
 everything else: the gRPC services, the handshake with the runner, the health check, and routing each
 call to your handler by kind.
 
@@ -36,30 +36,30 @@ The generated plugin, with a resource that can be provisioned and given access t
 each as inputs.
 
 ```go
-integration := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
+p := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
 
-integration.Resource("repository", plugin.ResourceOptions{
+p.Resource("repository", plugin.ResourceOptions{
 	Provision:   provision,
 	Deprovision: deprovision,
 })
 
-integration.Serve()
+p.Serve()
 ```
 
 ## What you declare
 
-**The integration**, in `plugin.Options`:
+**The plugin**, in `plugin.Options`:
 
 | Field | |
 |---|---|
 | `Name`, `Version` | Required. |
 | `Title`, `Description` | Shown in Steward. |
-| `Inputs` | What is required to create an integration, credentials included. |
-| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every integration is accepted. |
-| `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the integration as a whole, such as membership of an organization. |
+| `Inputs` | What is required to configure the plugin, credentials included. |
+| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every config is accepted. |
+| `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
-**A resource**, with `integration.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,
-with `integration.Application("kind", plugin.ApplicationOptions{...})`, are each declared under a kind that
+**A resource**, with `p.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,
+with `p.Application("kind", plugin.ApplicationOptions{...})`, are each declared under a kind that
 is unique within the plugin, such as `"repository"`, and take a `Title`, a `Description`, `Inputs` and
 `Outputs`. Resources also take `Roles` and `Permissions`. Applications take `Sources`, the types they can
 be deployed from: `"github"`, `"registry"`, `"s3"` or `"raw"`. The `Source` of an application arrives as
@@ -81,38 +81,44 @@ image digest or an object version, and is empty for the newest.
 Access exists at two levels, each with the same three handlers, `GrantAccess`, `RevokeAccess` and
 `GetAccess`:
 
-- **The integration**, in `plugin.Options`: membership of the tool as a whole, such as an organization
-  or a site. Steward grants this first, then access to the resources.
+- **The plugin**, in `plugin.Options`: membership of the tool as a whole, such as an organization or a
+  site. Steward grants this first, then access to the resources.
 - **A resource kind**, in `plugin.ResourceOptions`: a role on one resource, such as a repository.
 
-What you declare with `Roles` (and, for tools that expose them, `Permissions`) is what Steward offers
-for assignment. A role has a `Name` and the `Permissions` it contains, and a permission is a `Name`
-with an optional `Level`. Steward can also build its own roles from the permissions you declare.
+Declaring `Roles` or `Permissions` is what says that the plugin, or the kind, supports access. They are
+two separate lists:
+
+- **`Roles`** are the ones the tool defines itself, each with a `Name`, `Title` and `Description`.
+- **`Permissions`** are the pieces Steward builds its own roles from. A permission is a `Name` with an
+  optional `Level`.
 
 Handlers receive the `Identity` (`ExternalId`, `Name`, `Attrs`) and the `Role` to apply, and a resource
-call also gets the `Resource` (`Kind`, `Name`). They return:
+call also gets the `Resource` (`Kind`, `Name`). The `Role` is always set. For a role Steward composed
+from your permissions, `Permissions` lists its pieces too, for you to apply as far as the tool allows.
+They return:
 
-- `GrantAccess`: the `Role` as the tool applied it, which may differ from the one requested, an `Id`
-  for the grant if the tool has one (Steward sends it back on revoke), and `Pending: true` while the
-  person has to act first, such as accepting an invitation.
+- `GrantAccess`: the `Role` and `Permissions` as the tool applied them, which may differ from what was
+  requested, an `Id` for the grant if the tool has one (Steward sends it back on revoke), and
+  `Pending: true` while the person has to act first, such as accepting an invitation.
 - `RevokeAccess`: nothing. It succeeds if the identity did not have the role.
-- `GetAccess`: the `Roles` the identity holds now, and whether a grant is still `Pending`.
+- `GetAccess`: the `Roles` and `Permissions` the identity holds now, and whether a grant is still
+  `Pending`.
 
 Steward works out overlap between roles before it asks you to revoke one, so you can remove the role
 you are given in full.
 
-## Capabilities follow from your handlers
+## What you set is what is offered
 
-You never list capabilities. The SDK reads them from the handlers you set:
+You never list what a kind can do. Steward calls, and a call for something you did not set fails with
+`UNIMPLEMENTED`, which means it is not offered. The one thing you declare is access: roles or
+permissions say that it is supported.
 
 | You set | The kind can |
 |---|---|
-| `Provision`, `Deprovision` | be created and removed (provisioning) |
+| `Provision`, `Deprovision` | be created and removed |
 | `List` | be discovered (optional: Steward keeps track of what it creates, so `List` is only for finding resources that already exist) |
-| `GrantAccess`, `RevokeAccess`, `GetAccess` | have access granted (resources and the integration) |
+| `Roles` or `Permissions`, with `GrantAccess`, `RevokeAccess`, `GetAccess` | have access granted (resources and the plugin) |
 | `Create`, `Delete`, `Deploy`, `SetVariables`, `List` | be run as an application |
-
-A call for something you did not set fails with `UNIMPLEMENTED`.
 
 ## Handlers
 
@@ -120,11 +126,11 @@ A handler is `func(context.Context, *Request) (*Response, error)`, with the requ
 for the entity and the call: `ResourceProvisionRequest`, `ResourceProvisionResponse`. They are the
 generated contract messages, re-exported by the package so a plugin imports one thing.
 
-- **Getters are nil-safe.** Use `request.GetIntegration().GetSecrets()["token"]`: anything the runner
+- **Getters are nil-safe.** Use `request.GetConfig().GetSecrets()["token"]`: anything the runner
   did not send reads as empty.
-- **Inputs.** `Integration.Inputs` and `Inputs` hold the values that are not sensitive; call `.AsMap()`
+- **Inputs.** `Config.Inputs` and `Inputs` hold the values that are not sensitive; call `.AsMap()`
   on one for a plain `map[string]any` (numbers arrive as `float64`). Sensitive values arrive in
-  `Integration.Secrets` (and a resource's or application's `Secrets`) as a `map[string]string`. Never
+  `Config.Secrets` (and a resource's or application's `Secrets`) as a `map[string]string`. Never
   store them.
 - **Open-ended values in a response**, such as `Outputs`, are built with `plugin.Struct(map[string]any{...})`,
   and an input's `Default` with `plugin.Value(...)`. They take what JSON can hold; anything else

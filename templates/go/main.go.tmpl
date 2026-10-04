@@ -1,8 +1,7 @@
 // This is the file you edit. It declares what your plugin offers and implements the calls Steward
 // makes. The gRPC plumbing, the handshake and the health check live in the SDK.
 //
-// A plugin is one integration. Declare it and each kind of resource once, with its handlers
-// attached: Steward's forms and the capabilities of each kind (provisioning, discovery, access)
+// Declare the plugin and each kind of resource once, with its handlers attached: Steward's forms
 // follow from what you write here, and every call is routed to the right handler by kind. If your
 // plugin needs more than one tool, take the credentials for each as inputs.
 //
@@ -20,10 +19,10 @@ import (
 )
 
 // Check that the inputs and credentials work. Return an error per input the user can fix.
-func validate(ctx context.Context, request *plugin.IntegrationValidateRequest) (*plugin.IntegrationValidateResponse, error) {
-	response := &plugin.IntegrationValidateResponse{}
+func validate(ctx context.Context, request *plugin.PluginValidateRequest) (*plugin.PluginValidateResponse, error) {
+	response := &plugin.PluginValidateResponse{}
 
-	if request.GetIntegration().GetSecrets()["token"] == "" {
+	if request.GetConfig().GetSecrets()["token"] == "" {
 		response.Errors = append(response.Errors, &plugin.ValidationError{
 			Field:   "token",
 			Message: "An API token is required.",
@@ -34,27 +33,27 @@ func validate(ctx context.Context, request *plugin.IntegrationValidateRequest) (
 }
 
 // Create a resource called request.Name. Idempotent: if it already exists, succeed anyway. Return
-// what it produced, as declared in Outputs. The request also has the Integration and the Inputs.
+// what it produced, as declared in Outputs. The request also has the Config and the Inputs.
 func provision(ctx context.Context, request *plugin.ResourceProvisionRequest) (*plugin.ResourceProvisionResponse, error) {
-	baseURL := request.GetIntegration().GetInputs().AsMap()["base_url"]
+	baseURL := request.GetConfig().GetInputs().AsMap()["base_url"]
 
 	return &plugin.ResourceProvisionResponse{
 		Outputs: plugin.Struct(map[string]any{"url": fmt.Sprintf("%v/items/%s", baseURL, request.GetName())}),
 	}, nil
 }
 
-// Remove a resource. Idempotent: succeed if it is already gone. The request has the Integration and
-// the Resource (Kind, Name).
+// Remove a resource. Idempotent: succeed if it is already gone. The request has the Config and the
+// Resource (Kind, Name).
 func deprovision(ctx context.Context, request *plugin.ResourceDeprovisionRequest) (*plugin.ResourceDeprovisionResponse, error) {
 	return &plugin.ResourceDeprovisionResponse{}, nil
 }
 
-// Give an identity a role on the resource. Idempotent. Return the role as the tool applied it, an
-// Id for the grant if the tool has one, and Pending if the person has to act first, such as
-// accepting an invitation. The request has the Integration, Resource, Identity (ExternalId, Name,
-// Attrs) and Role.
+// Give an identity a role on the resource. Idempotent. The Role is always set. For a role Steward
+// composed, Permissions lists its pieces. Return what the tool applied, an Id for the grant if the
+// tool has one, and Pending if the person has to act first, such as accepting an invitation. The
+// request has the Config, Resource, Identity (ExternalId, Name, Attrs), Role and Permissions.
 func grantAccess(ctx context.Context, request *plugin.ResourceGrantAccessRequest) (*plugin.ResourceGrantAccessResponse, error) {
-	return &plugin.ResourceGrantAccessResponse{Role: request.GetRole()}, nil
+	return &plugin.ResourceGrantAccessResponse{Role: request.GetRole(), Permissions: request.GetPermissions()}, nil
 }
 
 // Take a role away. Idempotent: succeed if the identity does not have it.
@@ -62,22 +61,23 @@ func revokeAccess(ctx context.Context, request *plugin.ResourceRevokeAccessReque
 	return &plugin.ResourceRevokeAccessResponse{}, nil
 }
 
-// Report the roles the identity holds on the resource now, and whether a grant is still pending.
+// Report the roles and permissions the identity holds on the resource now, and whether a grant is
+// still pending.
 func getAccess(ctx context.Context, request *plugin.ResourceGetAccessRequest) (*plugin.ResourceGetAccessResponse, error) {
 	return &plugin.ResourceGetAccessResponse{}, nil
 }
 
 func main() {
-	// The integration is one connection to the tool. Steward builds its form from Inputs, so it is
-	// also the documentation people see. Mark credentials Sensitive: they arrive in
-	// request.Integration.Secrets, the other inputs in request.Integration.Inputs.
-	integration := plugin.New(plugin.Options{
+	// Steward builds the plugin's form from Inputs, so it is also the documentation people see. Mark
+	// credentials Sensitive: they arrive in request.Config.Secrets, the other inputs in
+	// request.Config.Inputs.
+	p := plugin.New(plugin.Options{
 		Name:        "[[.Name]]",
 		Version:     "0.1.0",
 		Title:       "[[.Title]]",
 		Description: "Connects Steward to [[.Title]].",
 
-		// What is required to create an integration from this plugin.
+		// What is required to configure this plugin.
 		Inputs: []*plugin.InputDefinition{
 			{Name: "base_url", Label: "Base URL", Type: plugin.TypeString, Required: true},
 			{Name: "token", Label: "API token", Type: plugin.TypeString, Required: true, Sensitive: true},
@@ -86,8 +86,8 @@ func main() {
 		Validate: validate,
 	})
 
-	// A kind of resource this integration manages.
-	integration.Resource("item", plugin.ResourceOptions{
+	// A kind of resource this plugin manages.
+	p.Resource("item", plugin.ResourceOptions{
 		Title:       "Item",
 		Description: "An example resource.",
 
@@ -95,11 +95,16 @@ func main() {
 		Inputs:  []*plugin.InputDefinition{{Name: "description", Label: "Description", Type: plugin.TypeString}},
 		Outputs: []*plugin.OutputDefinition{{Name: "url", Label: "URL", Type: plugin.TypeString}},
 
-		// What can be granted on this kind: the tool's roles, and the permissions each contains.
-		// Writing the three access handlers is what makes the kind accept access.
+		// What can be granted on this kind. Declaring permissions or roles is what makes the kind
+		// accept access, along with the three access handlers. The permissions are the pieces Steward
+		// builds its own roles from; the roles are the ones the tool defines itself.
+		Permissions: []*plugin.PermissionDefinition{
+			{Name: "view", Title: "View"},
+			{Name: "edit", Title: "Edit"},
+		},
 		Roles: []*plugin.RoleDefinition{
-			{Name: "read", Title: "Read", Permissions: []*plugin.Permission{{Name: "view"}}},
-			{Name: "write", Title: "Write", Permissions: []*plugin.Permission{{Name: "view"}, {Name: "edit"}}},
+			{Name: "viewer", Title: "Viewer"},
+			{Name: "editor", Title: "Editor"},
 		},
 
 		Provision:    provision,
@@ -109,5 +114,5 @@ func main() {
 		GetAccess:    getAccess,
 	})
 
-	integration.Serve()
+	p.Serve()
 }

@@ -1,15 +1,14 @@
 // Package plugin is the plugin part of the Steward SDK for Go: the plumbing between the plugin
 // contract (gRPC, see ../../proto) and the functions a plugin writes.
 //
-//	integration := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
-//	integration.Resource("repository", plugin.ResourceOptions{Provision: provision, Deprovision: deprovision})
-//	integration.Serve()
+//	p := plugin.New(plugin.Options{Name: "github", Version: "0.1.0", Inputs: inputs, Validate: validate})
+//	p.Resource("repository", plugin.ResourceOptions{Provision: provision, Deprovision: deprovision})
+//	p.Serve()
 //
-// A plugin is one integration, like a provider. It declares that integration and each of its resource
-// or application kinds once, with the handlers attached. The SDK routes every call to the right
-// handler by kind, builds the description Steward asks for (including each kind's capabilities, which
-// follow from the handlers it has), serves the gRPC services, prints the handshake line, answers the
-// health check, and answers any call without a handler with UNIMPLEMENTED.
+// A plugin declares itself and each of its resource or application kinds once, with the handlers
+// attached. The SDK routes every call to the right
+// handler by kind, builds the description Steward asks for, serves the gRPC services, prints the
+// handshake line, answers the health check, and answers any call without a handler with UNIMPLEMENTED.
 //
 // Everything a plugin logs must go to stderr: stdout is reserved for the handshake line.
 //
@@ -27,30 +26,30 @@ import (
 	pluginv1 "github.com/treno-dev/steward-sdk/go/gen/steward/plugin/v1"
 )
 
-// Options declare the plugin and its integration: what is needed to create an integration from it,
-// and, when the integration supports access as a whole, the handlers for that.
+// Options declare the plugin: what is needed to configure it and, when it supports access as a
+// whole, the handlers for that.
 type Options struct {
 	Name        string
 	Version     string
 	Title       string
 	Description string
 
-	// Inputs is what is required to create an integration, credentials included.
+	// Inputs is what is required to configure the plugin, credentials included.
 	Inputs []*InputDefinition
 
 	// Validate checks the inputs and credentials.
-	Validate func(context.Context, *IntegrationValidateRequest) (*IntegrationValidateResponse, error)
+	Validate func(context.Context, *PluginValidateRequest) (*PluginValidateResponse, error)
 
-	// What can be granted on the integration as a whole, and the handlers that grant it.
+	// What can be granted on the plugin as a whole, and the handlers that grant it.
 	Permissions []*PermissionDefinition
 	Roles       []*RoleDefinition
 
-	GrantAccess  func(context.Context, *IntegrationGrantAccessRequest) (*IntegrationGrantAccessResponse, error)
-	RevokeAccess func(context.Context, *IntegrationRevokeAccessRequest) (*IntegrationRevokeAccessResponse, error)
-	GetAccess    func(context.Context, *IntegrationGetAccessRequest) (*IntegrationGetAccessResponse, error)
+	GrantAccess  func(context.Context, *PluginGrantAccessRequest) (*PluginGrantAccessResponse, error)
+	RevokeAccess func(context.Context, *PluginRevokeAccessRequest) (*PluginRevokeAccessResponse, error)
+	GetAccess    func(context.Context, *PluginGetAccessRequest) (*PluginGetAccessResponse, error)
 }
 
-// ResourceOptions describe a kind of resource the integration manages, with its handlers. A call
+// ResourceOptions describe a kind of resource the plugin manages, with its handlers. A call
 // for something without a handler fails with UNIMPLEMENTED.
 type ResourceOptions struct {
 	Title       string
@@ -73,7 +72,7 @@ type ResourceOptions struct {
 	GetAccess    func(context.Context, *ResourceGetAccessRequest) (*ResourceGetAccessResponse, error)
 }
 
-// ApplicationOptions describe a kind of application the integration runs, with its handlers.
+// ApplicationOptions describe a kind of application the plugin runs, with its handlers.
 type ApplicationOptions struct {
 	Title       string
 	Description string
@@ -91,7 +90,7 @@ type ApplicationOptions struct {
 	List         func(context.Context, *ApplicationListRequest) (*ApplicationListResponse, error)
 }
 
-// Plugin is one integration. Declare its resources and applications, then call Serve.
+// Plugin is what a plugin author builds. Declare its resources and applications, then call Serve.
 type Plugin struct {
 	options      Options
 	resources    map[string]ResourceOptions
@@ -102,7 +101,7 @@ type Plugin struct {
 	applicationOrder []string
 }
 
-// New creates a plugin, which is one integration.
+// New creates a plugin.
 func New(options Options) *Plugin {
 	return &Plugin{
 		options:      options,
@@ -111,7 +110,7 @@ func New(options Options) *Plugin {
 	}
 }
 
-// Resource declares a kind of resource the integration manages. The kind is unique within the
+// Resource declares a kind of resource the plugin manages. The kind is unique within the
 // plugin, such as "repository".
 func (p *Plugin) Resource(kind string, options ResourceOptions) *Plugin {
 	if _, declared := p.resources[kind]; !declared {
@@ -123,7 +122,7 @@ func (p *Plugin) Resource(kind string, options ResourceOptions) *Plugin {
 	return p
 }
 
-// Application declares a kind of application the integration runs. The kind is unique within the
+// Application declares a kind of application the plugin runs. The kind is unique within the
 // plugin, such as "laravel".
 func (p *Plugin) Application(kind string, options ApplicationOptions) *Plugin {
 	if _, declared := p.applications[kind]; !declared {
@@ -135,15 +134,9 @@ func (p *Plugin) Application(kind string, options ApplicationOptions) *Plugin {
 	return p
 }
 
-func (p *Plugin) hasIntegrationAccess() bool {
-	o := p.options
-
-	return o.GrantAccess != nil || o.RevokeAccess != nil || o.GetAccess != nil
-}
-
 func (p *Plugin) describe() *pluginv1.DescribeResponse {
 	o := p.options
-	integration := &pluginv1.IntegrationDefinition{
+	definition := &pluginv1.PluginDefinition{
 		Title:       o.Title,
 		Description: o.Description,
 		Inputs:      o.Inputs,
@@ -151,17 +144,13 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 		Roles:       o.Roles,
 	}
 
-	if p.hasIntegrationAccess() {
-		integration.Capabilities = []pluginv1.IntegrationCapability{pluginv1.IntegrationCapability_INTEGRATION_CAPABILITY_ACCESS}
-	}
-
 	for _, name := range p.resourceOrder {
-		integration.Resources = append(integration.Resources, resourceDefinition(name, p.resources[name]))
+		definition.Resources = append(definition.Resources, resourceDefinition(name, p.resources[name]))
 	}
 
 	for _, name := range p.applicationOrder {
 		options := p.applications[name]
-		integration.Applications = append(integration.Applications, &pluginv1.ApplicationDefinition{
+		definition.Applications = append(definition.Applications, &pluginv1.ApplicationDefinition{
 			Kind:        name,
 			Title:       options.Title,
 			Description: options.Description,
@@ -171,33 +160,18 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 		})
 	}
 
-	return &pluginv1.DescribeResponse{Name: o.Name, Version: o.Version, Integration: integration}
+	return &pluginv1.DescribeResponse{Name: o.Name, Version: o.Version, Definition: definition}
 }
 
 func resourceDefinition(kind string, options ResourceOptions) *pluginv1.ResourceDefinition {
-	var capabilities []pluginv1.ResourceCapability
-
-	if options.GrantAccess != nil || options.RevokeAccess != nil || options.GetAccess != nil {
-		capabilities = append(capabilities, pluginv1.ResourceCapability_RESOURCE_CAPABILITY_ACCESS)
-	}
-
-	if options.Provision != nil || options.Deprovision != nil {
-		capabilities = append(capabilities, pluginv1.ResourceCapability_RESOURCE_CAPABILITY_PROVISIONING)
-	}
-
-	if options.List != nil {
-		capabilities = append(capabilities, pluginv1.ResourceCapability_RESOURCE_CAPABILITY_DISCOVERY)
-	}
-
 	return &pluginv1.ResourceDefinition{
-		Kind:         kind,
-		Title:        options.Title,
-		Description:  options.Description,
-		Inputs:       options.Inputs,
-		Capabilities: capabilities,
-		Permissions:  options.Permissions,
-		Roles:        options.Roles,
-		Outputs:      options.Outputs,
+		Kind:        kind,
+		Title:       options.Title,
+		Description: options.Description,
+		Inputs:      options.Inputs,
+		Permissions: options.Permissions,
+		Roles:       options.Roles,
+		Outputs:     options.Outputs,
 	}
 }
 

@@ -35,8 +35,8 @@ func Value(value any) *structpb.Value {
 // The messages a plugin works with, from the generated contract, so a plugin imports one package.
 // Requests and responses are named for what they handle (the entity, then the call).
 type (
-	Integration       = pluginv1.Integration
-	Resource          = pluginv1.Resource
+	PluginConfig      = pluginv1.PluginConfig
+	Resource        = pluginv1.Resource
 	Application       = pluginv1.Application
 	ApplicationSource = pluginv1.ApplicationSource
 	Variable          = pluginv1.Variable
@@ -50,14 +50,14 @@ type (
 	RoleDefinition       = pluginv1.RoleDefinition
 	ValidationError      = pluginv1.ValidationError
 
-	IntegrationValidateRequest      = pluginv1.ValidateRequest
-	IntegrationValidateResponse     = pluginv1.ValidateResponse
-	IntegrationGrantAccessRequest   = pluginv1.IntegrationServiceGrantAccessRequest
-	IntegrationGrantAccessResponse  = pluginv1.IntegrationServiceGrantAccessResponse
-	IntegrationRevokeAccessRequest  = pluginv1.IntegrationServiceRevokeAccessRequest
-	IntegrationRevokeAccessResponse = pluginv1.IntegrationServiceRevokeAccessResponse
-	IntegrationGetAccessRequest     = pluginv1.IntegrationServiceGetAccessRequest
-	IntegrationGetAccessResponse    = pluginv1.IntegrationServiceGetAccessResponse
+	PluginValidateRequest      = pluginv1.ValidateRequest
+	PluginValidateResponse     = pluginv1.ValidateResponse
+	PluginGrantAccessRequest   = pluginv1.PluginServiceGrantAccessRequest
+	PluginGrantAccessResponse  = pluginv1.PluginServiceGrantAccessResponse
+	PluginRevokeAccessRequest  = pluginv1.PluginServiceRevokeAccessRequest
+	PluginRevokeAccessResponse = pluginv1.PluginServiceRevokeAccessResponse
+	PluginGetAccessRequest     = pluginv1.PluginServiceGetAccessRequest
+	PluginGetAccessResponse    = pluginv1.PluginServiceGetAccessResponse
 
 	ResourceProvisionRequest     = pluginv1.ResourceServiceProvisionRequest
 	ResourceProvisionResponse    = pluginv1.ResourceServiceProvisionResponse

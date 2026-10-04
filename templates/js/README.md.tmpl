@@ -15,16 +15,16 @@ to invoke it. Write logs to standard error.
 
 ## Test
 
-Save this as `context.json`, the integration and resources to call the plugin with:
+Save this as `context.json`, the config and resources to call the plugin with:
 
 ```json
 {
-  "integration": {
+  "config": {
     "inputs": { "base_url": "https://example.test" },
     "secrets": { "token": "secret" }
   },
   "identity": { "external_id": "someone@example.test" },
-  "role": { "name": "read" },
+  "role": { "name": "viewer", "permissions": [{ "name": "view" }] },
   "resources": [{ "kind": "item", "name": "demo", "inputs": { "description": "A demo item" } }]
 }
 ```
@@ -41,7 +41,7 @@ only the calls you name, once each and without cleaning up: `provision`, `grant-
 
 ## Where things are
 
-`src/plugin.js` declares the integration (what it needs to connect), each kind of resource and the
+`src/plugin.js` declares the plugin's inputs (what it needs to connect), each kind of resource and the
 handlers Steward calls: `provision`, `deprovision`, `grantAccess`, `revokeAccess` and `getAccess`.
 Delete the handlers you do not need: Steward offers only what you implement.
 

@@ -19,20 +19,30 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PluginService_Describe_FullMethodName = "/steward.plugin.v1.PluginService/Describe"
-	PluginService_Validate_FullMethodName = "/steward.plugin.v1.PluginService/Validate"
+	PluginService_Describe_FullMethodName     = "/steward.plugin.v1.PluginService/Describe"
+	PluginService_Validate_FullMethodName     = "/steward.plugin.v1.PluginService/Validate"
+	PluginService_GrantAccess_FullMethodName  = "/steward.plugin.v1.PluginService/GrantAccess"
+	PluginService_RevokeAccess_FullMethodName = "/steward.plugin.v1.PluginService/RevokeAccess"
+	PluginService_GetAccess_FullMethodName    = "/steward.plugin.v1.PluginService/GetAccess"
 )
 
 // PluginServiceClient is the client API for PluginService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// Mandatory for every plugin.
+// Mandatory for every plugin. Describe and Validate are always served. GrantAccess, RevokeAccess and
+// GetAccess apply only to a plugin that declares roles or permissions, and answer UNIMPLEMENTED
+// otherwise.
 type PluginServiceClient interface {
-	// Describes the plugin: what its integration needs (its inputs) and the resources it manages.
+	// Describes the plugin: what it needs (its inputs) and the resources it manages.
 	Describe(ctx context.Context, in *DescribeRequest, opts ...grpc.CallOption) (*DescribeResponse, error)
-	// Checks an integration, for example that the inputs are valid and the credentials work.
+	// Checks a config, for example that the inputs are valid and the credentials work.
 	Validate(ctx context.Context, in *ValidateRequest, opts ...grpc.CallOption) (*ValidateResponse, error)
+	// Access to the plugin as a whole: giving identities roles on it, taking them away, and checking
+	// what they hold.
+	GrantAccess(ctx context.Context, in *PluginServiceGrantAccessRequest, opts ...grpc.CallOption) (*PluginServiceGrantAccessResponse, error)
+	RevokeAccess(ctx context.Context, in *PluginServiceRevokeAccessRequest, opts ...grpc.CallOption) (*PluginServiceRevokeAccessResponse, error)
+	GetAccess(ctx context.Context, in *PluginServiceGetAccessRequest, opts ...grpc.CallOption) (*PluginServiceGetAccessResponse, error)
 }
 
 type pluginServiceClient struct {
@@ -63,16 +73,53 @@ func (c *pluginServiceClient) Validate(ctx context.Context, in *ValidateRequest,
 	return out, nil
 }
 
+func (c *pluginServiceClient) GrantAccess(ctx context.Context, in *PluginServiceGrantAccessRequest, opts ...grpc.CallOption) (*PluginServiceGrantAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginServiceGrantAccessResponse)
+	err := c.cc.Invoke(ctx, PluginService_GrantAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pluginServiceClient) RevokeAccess(ctx context.Context, in *PluginServiceRevokeAccessRequest, opts ...grpc.CallOption) (*PluginServiceRevokeAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginServiceRevokeAccessResponse)
+	err := c.cc.Invoke(ctx, PluginService_RevokeAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pluginServiceClient) GetAccess(ctx context.Context, in *PluginServiceGetAccessRequest, opts ...grpc.CallOption) (*PluginServiceGetAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PluginServiceGetAccessResponse)
+	err := c.cc.Invoke(ctx, PluginService_GetAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PluginServiceServer is the server API for PluginService service.
 // All implementations must embed UnimplementedPluginServiceServer
 // for forward compatibility.
 //
-// Mandatory for every plugin.
+// Mandatory for every plugin. Describe and Validate are always served. GrantAccess, RevokeAccess and
+// GetAccess apply only to a plugin that declares roles or permissions, and answer UNIMPLEMENTED
+// otherwise.
 type PluginServiceServer interface {
-	// Describes the plugin: what its integration needs (its inputs) and the resources it manages.
+	// Describes the plugin: what it needs (its inputs) and the resources it manages.
 	Describe(context.Context, *DescribeRequest) (*DescribeResponse, error)
-	// Checks an integration, for example that the inputs are valid and the credentials work.
+	// Checks a config, for example that the inputs are valid and the credentials work.
 	Validate(context.Context, *ValidateRequest) (*ValidateResponse, error)
+	// Access to the plugin as a whole: giving identities roles on it, taking them away, and checking
+	// what they hold.
+	GrantAccess(context.Context, *PluginServiceGrantAccessRequest) (*PluginServiceGrantAccessResponse, error)
+	RevokeAccess(context.Context, *PluginServiceRevokeAccessRequest) (*PluginServiceRevokeAccessResponse, error)
+	GetAccess(context.Context, *PluginServiceGetAccessRequest) (*PluginServiceGetAccessResponse, error)
 	mustEmbedUnimplementedPluginServiceServer()
 }
 
@@ -88,6 +135,15 @@ func (UnimplementedPluginServiceServer) Describe(context.Context, *DescribeReque
 }
 func (UnimplementedPluginServiceServer) Validate(context.Context, *ValidateRequest) (*ValidateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Validate not implemented")
+}
+func (UnimplementedPluginServiceServer) GrantAccess(context.Context, *PluginServiceGrantAccessRequest) (*PluginServiceGrantAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GrantAccess not implemented")
+}
+func (UnimplementedPluginServiceServer) RevokeAccess(context.Context, *PluginServiceRevokeAccessRequest) (*PluginServiceRevokeAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAccess not implemented")
+}
+func (UnimplementedPluginServiceServer) GetAccess(context.Context, *PluginServiceGetAccessRequest) (*PluginServiceGetAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccess not implemented")
 }
 func (UnimplementedPluginServiceServer) mustEmbedUnimplementedPluginServiceServer() {}
 func (UnimplementedPluginServiceServer) testEmbeddedByValue()                       {}
@@ -146,6 +202,60 @@ func _PluginService_Validate_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PluginService_GrantAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginServiceGrantAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).GrantAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_GrantAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).GrantAccess(ctx, req.(*PluginServiceGrantAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PluginService_RevokeAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginServiceRevokeAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).RevokeAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_RevokeAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).RevokeAccess(ctx, req.(*PluginServiceRevokeAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PluginService_GetAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PluginServiceGetAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PluginServiceServer).GetAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PluginService_GetAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PluginServiceServer).GetAccess(ctx, req.(*PluginServiceGetAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PluginService_ServiceDesc is the grpc.ServiceDesc for PluginService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -161,189 +271,17 @@ var PluginService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Validate",
 			Handler:    _PluginService_Validate_Handler,
 		},
-	},
-	Streams:  []grpc.StreamDesc{},
-	Metadata: "steward/plugin/v1/plugin.proto",
-}
-
-const (
-	IntegrationService_GrantAccess_FullMethodName  = "/steward.plugin.v1.IntegrationService/GrantAccess"
-	IntegrationService_RevokeAccess_FullMethodName = "/steward.plugin.v1.IntegrationService/RevokeAccess"
-	IntegrationService_GetAccess_FullMethodName    = "/steward.plugin.v1.IntegrationService/GetAccess"
-)
-
-// IntegrationServiceClient is the client API for IntegrationService service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// For plugins whose integration supports access as a whole (INTEGRATION_CAPABILITY_ACCESS):
-// giving identities roles on the integration, taking them away, and checking what they hold.
-type IntegrationServiceClient interface {
-	GrantAccess(ctx context.Context, in *IntegrationServiceGrantAccessRequest, opts ...grpc.CallOption) (*IntegrationServiceGrantAccessResponse, error)
-	RevokeAccess(ctx context.Context, in *IntegrationServiceRevokeAccessRequest, opts ...grpc.CallOption) (*IntegrationServiceRevokeAccessResponse, error)
-	GetAccess(ctx context.Context, in *IntegrationServiceGetAccessRequest, opts ...grpc.CallOption) (*IntegrationServiceGetAccessResponse, error)
-}
-
-type integrationServiceClient struct {
-	cc grpc.ClientConnInterface
-}
-
-func NewIntegrationServiceClient(cc grpc.ClientConnInterface) IntegrationServiceClient {
-	return &integrationServiceClient{cc}
-}
-
-func (c *integrationServiceClient) GrantAccess(ctx context.Context, in *IntegrationServiceGrantAccessRequest, opts ...grpc.CallOption) (*IntegrationServiceGrantAccessResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(IntegrationServiceGrantAccessResponse)
-	err := c.cc.Invoke(ctx, IntegrationService_GrantAccess_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *integrationServiceClient) RevokeAccess(ctx context.Context, in *IntegrationServiceRevokeAccessRequest, opts ...grpc.CallOption) (*IntegrationServiceRevokeAccessResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(IntegrationServiceRevokeAccessResponse)
-	err := c.cc.Invoke(ctx, IntegrationService_RevokeAccess_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *integrationServiceClient) GetAccess(ctx context.Context, in *IntegrationServiceGetAccessRequest, opts ...grpc.CallOption) (*IntegrationServiceGetAccessResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(IntegrationServiceGetAccessResponse)
-	err := c.cc.Invoke(ctx, IntegrationService_GetAccess_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// IntegrationServiceServer is the server API for IntegrationService service.
-// All implementations must embed UnimplementedIntegrationServiceServer
-// for forward compatibility.
-//
-// For plugins whose integration supports access as a whole (INTEGRATION_CAPABILITY_ACCESS):
-// giving identities roles on the integration, taking them away, and checking what they hold.
-type IntegrationServiceServer interface {
-	GrantAccess(context.Context, *IntegrationServiceGrantAccessRequest) (*IntegrationServiceGrantAccessResponse, error)
-	RevokeAccess(context.Context, *IntegrationServiceRevokeAccessRequest) (*IntegrationServiceRevokeAccessResponse, error)
-	GetAccess(context.Context, *IntegrationServiceGetAccessRequest) (*IntegrationServiceGetAccessResponse, error)
-	mustEmbedUnimplementedIntegrationServiceServer()
-}
-
-// UnimplementedIntegrationServiceServer must be embedded to have
-// forward compatible implementations.
-//
-// NOTE: this should be embedded by value instead of pointer to avoid a nil
-// pointer dereference when methods are called.
-type UnimplementedIntegrationServiceServer struct{}
-
-func (UnimplementedIntegrationServiceServer) GrantAccess(context.Context, *IntegrationServiceGrantAccessRequest) (*IntegrationServiceGrantAccessResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GrantAccess not implemented")
-}
-func (UnimplementedIntegrationServiceServer) RevokeAccess(context.Context, *IntegrationServiceRevokeAccessRequest) (*IntegrationServiceRevokeAccessResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RevokeAccess not implemented")
-}
-func (UnimplementedIntegrationServiceServer) GetAccess(context.Context, *IntegrationServiceGetAccessRequest) (*IntegrationServiceGetAccessResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAccess not implemented")
-}
-func (UnimplementedIntegrationServiceServer) mustEmbedUnimplementedIntegrationServiceServer() {}
-func (UnimplementedIntegrationServiceServer) testEmbeddedByValue()                            {}
-
-// UnsafeIntegrationServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to IntegrationServiceServer will
-// result in compilation errors.
-type UnsafeIntegrationServiceServer interface {
-	mustEmbedUnimplementedIntegrationServiceServer()
-}
-
-func RegisterIntegrationServiceServer(s grpc.ServiceRegistrar, srv IntegrationServiceServer) {
-	// If the following call panics, it indicates UnimplementedIntegrationServiceServer was
-	// embedded by pointer and is nil.  This will cause panics if an
-	// unimplemented method is ever invoked, so we test this at initialization
-	// time to prevent it from happening at runtime later due to I/O.
-	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
-		t.testEmbeddedByValue()
-	}
-	s.RegisterService(&IntegrationService_ServiceDesc, srv)
-}
-
-func _IntegrationService_GrantAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IntegrationServiceGrantAccessRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IntegrationServiceServer).GrantAccess(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: IntegrationService_GrantAccess_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IntegrationServiceServer).GrantAccess(ctx, req.(*IntegrationServiceGrantAccessRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _IntegrationService_RevokeAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IntegrationServiceRevokeAccessRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IntegrationServiceServer).RevokeAccess(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: IntegrationService_RevokeAccess_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IntegrationServiceServer).RevokeAccess(ctx, req.(*IntegrationServiceRevokeAccessRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _IntegrationService_GetAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IntegrationServiceGetAccessRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IntegrationServiceServer).GetAccess(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: IntegrationService_GetAccess_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IntegrationServiceServer).GetAccess(ctx, req.(*IntegrationServiceGetAccessRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// IntegrationService_ServiceDesc is the grpc.ServiceDesc for IntegrationService service.
-// It's only intended for direct use with grpc.RegisterService,
-// and not to be introspected or modified (even as a copy)
-var IntegrationService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "steward.plugin.v1.IntegrationService",
-	HandlerType: (*IntegrationServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GrantAccess",
-			Handler:    _IntegrationService_GrantAccess_Handler,
+			Handler:    _PluginService_GrantAccess_Handler,
 		},
 		{
 			MethodName: "RevokeAccess",
-			Handler:    _IntegrationService_RevokeAccess_Handler,
+			Handler:    _PluginService_RevokeAccess_Handler,
 		},
 		{
 			MethodName: "GetAccess",
-			Handler:    _IntegrationService_GetAccess_Handler,
+			Handler:    _PluginService_GetAccess_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -363,9 +301,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// For plugins that manage resources. Each call applies only to resource kinds that declared the
-// matching capability in ResourceDefinition.capabilities: access for GrantAccess, RevokeAccess and
-// GetAccess, provisioning for Provision and Deprovision, discovery for List.
+// For plugins that manage resources. A call a resource kind does not offer answers UNIMPLEMENTED.
+// GrantAccess, RevokeAccess and GetAccess are offered by kinds that declare roles or permissions.
 type ResourceServiceClient interface {
 	GrantAccess(ctx context.Context, in *ResourceServiceGrantAccessRequest, opts ...grpc.CallOption) (*ResourceServiceGrantAccessResponse, error)
 	RevokeAccess(ctx context.Context, in *ResourceServiceRevokeAccessRequest, opts ...grpc.CallOption) (*ResourceServiceRevokeAccessResponse, error)
@@ -447,9 +384,8 @@ func (c *resourceServiceClient) List(ctx context.Context, in *ResourceServiceLis
 // All implementations must embed UnimplementedResourceServiceServer
 // for forward compatibility.
 //
-// For plugins that manage resources. Each call applies only to resource kinds that declared the
-// matching capability in ResourceDefinition.capabilities: access for GrantAccess, RevokeAccess and
-// GetAccess, provisioning for Provision and Deprovision, discovery for List.
+// For plugins that manage resources. A call a resource kind does not offer answers UNIMPLEMENTED.
+// GrantAccess, RevokeAccess and GetAccess are offered by kinds that declare roles or permissions.
 type ResourceServiceServer interface {
 	GrantAccess(context.Context, *ResourceServiceGrantAccessRequest) (*ResourceServiceGrantAccessResponse, error)
 	RevokeAccess(context.Context, *ResourceServiceRevokeAccessRequest) (*ResourceServiceRevokeAccessResponse, error)
@@ -662,8 +598,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// For plugins whose integration runs applications (IntegrationDefinition.applications): deployable
-// things with a source and open-ended variables.
+// For plugins that run applications (PluginDefinition.applications): deployable things with a source
+// and open-ended variables.
 type ApplicationServiceClient interface {
 	Create(ctx context.Context, in *ApplicationServiceCreateRequest, opts ...grpc.CallOption) (*ApplicationServiceCreateResponse, error)
 	Delete(ctx context.Context, in *ApplicationServiceDeleteRequest, opts ...grpc.CallOption) (*ApplicationServiceDeleteResponse, error)
@@ -734,8 +670,8 @@ func (c *applicationServiceClient) List(ctx context.Context, in *ApplicationServ
 // All implementations must embed UnimplementedApplicationServiceServer
 // for forward compatibility.
 //
-// For plugins whose integration runs applications (IntegrationDefinition.applications): deployable
-// things with a source and open-ended variables.
+// For plugins that run applications (PluginDefinition.applications): deployable things with a source
+// and open-ended variables.
 type ApplicationServiceServer interface {
 	Create(context.Context, *ApplicationServiceCreateRequest) (*ApplicationServiceCreateResponse, error)
 	Delete(context.Context, *ApplicationServiceDeleteRequest) (*ApplicationServiceDeleteResponse, error)

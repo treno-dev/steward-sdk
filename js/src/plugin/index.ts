@@ -7,12 +7,11 @@
 //   plugin.resource({ kind: 'repository', inputs: [...], provision, deprovision, list });
 //   plugin.serve();
 //
-// A plugin is one integration, like a provider. It declares that integration and each of its
-// resource or application kinds once, with the handlers attached. The SDK routes every call to the
-// right handler by kind, builds the description Steward asks for (including each kind's
-// capabilities, which follow from the handlers it has), serves the gRPC services, prints the
-// handshake line, answers the health check, fills in whatever a handler leaves out of its response,
-// and answers any call without a handler with UNIMPLEMENTED.
+// A plugin declares itself and each of its resource or application kinds once, with the handlers
+// attached. The SDK routes every call to the right handler by kind, builds the description Steward
+// asks for, serves the gRPC services, prints the handshake line, answers the health check, fills in
+// whatever a handler leaves out of its response, and answers any call without a handler with
+// UNIMPLEMENTED.
 //
 // Everything a plugin logs must go to stderr: stdout is reserved for the handshake line.
 //
@@ -30,9 +29,9 @@ import type {
   ApplicationDefinition,
   DeepPartial,
   InputDefinition,
-  IntegrationDefinition,
   OutputDefinition,
   PermissionDefinition,
+  PluginDefinition,
   ResourceDefinition,
   RoleDefinition,
 } from '../gen/steward/plugin/v1/plugin.js';
@@ -66,14 +65,14 @@ type Complete<Message> = Message extends (infer Item)[]
 // The request and response of each handler, named for what it handles (the entity, then the call),
 // for annotating your own handlers. A request has its message fields present, and a response may
 // leave fields out.
-export type IntegrationValidateRequest = Complete<contract.ValidateRequest>;
-export type IntegrationValidateResponse = DeepPartial<contract.ValidateResponse>;
-export type IntegrationGrantAccessRequest = Complete<contract.IntegrationServiceGrantAccessRequest>;
-export type IntegrationGrantAccessResponse = DeepPartial<contract.IntegrationServiceGrantAccessResponse>;
-export type IntegrationRevokeAccessRequest = Complete<contract.IntegrationServiceRevokeAccessRequest>;
-export type IntegrationRevokeAccessResponse = DeepPartial<contract.IntegrationServiceRevokeAccessResponse>;
-export type IntegrationGetAccessRequest = Complete<contract.IntegrationServiceGetAccessRequest>;
-export type IntegrationGetAccessResponse = DeepPartial<contract.IntegrationServiceGetAccessResponse>;
+export type PluginValidateRequest = Complete<contract.ValidateRequest>;
+export type PluginValidateResponse = DeepPartial<contract.ValidateResponse>;
+export type PluginGrantAccessRequest = Complete<contract.PluginServiceGrantAccessRequest>;
+export type PluginGrantAccessResponse = DeepPartial<contract.PluginServiceGrantAccessResponse>;
+export type PluginRevokeAccessRequest = Complete<contract.PluginServiceRevokeAccessRequest>;
+export type PluginRevokeAccessResponse = DeepPartial<contract.PluginServiceRevokeAccessResponse>;
+export type PluginGetAccessRequest = Complete<contract.PluginServiceGetAccessRequest>;
+export type PluginGetAccessResponse = DeepPartial<contract.PluginServiceGetAccessResponse>;
 export type ResourceProvisionRequest = Complete<contract.ResourceServiceProvisionRequest>;
 export type ResourceProvisionResponse = DeepPartial<contract.ResourceServiceProvisionResponse>;
 export type ResourceDeprovisionRequest = Complete<contract.ResourceServiceDeprovisionRequest>;
@@ -119,14 +118,13 @@ type Access = {
   roles?: DeepPartial<RoleDefinition>[];
 };
 
-// The plugin and its integration: what is needed to create an integration from it, and, when the
-// integration supports access as a whole, the handlers for that.
+// The plugin: what is needed to configure it, and, when it supports access as a whole, the handlers
+// for that.
 export type PluginOptions = Describe &
   Access & {
     name: string;
     version: string;
-    validate?: Handlers<typeof contract.PluginServiceService>['validate'];
-  } & Handlers<typeof contract.IntegrationServiceService>;
+  } & Omit<Handlers<typeof contract.PluginServiceService>, 'describe'>;
 
 export type ResourceOptions = Describe &
   Access & {
@@ -147,14 +145,10 @@ type AnyRequest = {
   application?: { kind: string };
 };
 
-type Target = 'integration' | 'resource' | 'application';
+type Target = 'plugin' | 'resource' | 'application';
 
 const ACCESS_CALLS = ['grantAccess', 'revokeAccess', 'getAccess'] as const;
 const PROVISIONING_CALLS = ['provision', 'deprovision'] as const;
-
-function has(options: object, calls: readonly string[]): boolean {
-  return calls.some((call) => typeof (options as Record<string, unknown>)[call] === 'function');
-}
 
 function fail(code: grpc.status, message: string): never {
   throw { code, message };
@@ -162,21 +156,8 @@ function fail(code: grpc.status, message: string): never {
 
 function resourceDefinition(options: ResourceOptions): DeepPartial<ResourceDefinition> {
   const { kind, title, description, inputs, outputs, permissions, roles } = options;
-  const capabilities: contract.ResourceCapability[] = [];
 
-  if (has(options, ACCESS_CALLS)) {
-    capabilities.push(contract.ResourceCapability.RESOURCE_CAPABILITY_ACCESS);
-  }
-
-  if (has(options, PROVISIONING_CALLS)) {
-    capabilities.push(contract.ResourceCapability.RESOURCE_CAPABILITY_PROVISIONING);
-  }
-
-  if (has(options, ['list'])) {
-    capabilities.push(contract.ResourceCapability.RESOURCE_CAPABILITY_DISCOVERY);
-  }
-
-  return { kind, title, description, inputs, outputs, permissions, roles, capabilities };
+  return { kind, title, description, inputs, outputs, permissions, roles };
 }
 
 function applicationDefinition(options: ApplicationOptions): DeepPartial<ApplicationDefinition> {
@@ -191,14 +172,14 @@ export class Plugin {
 
   constructor(readonly options: PluginOptions) {}
 
-  /** Declares a kind of resource the integration manages, with its handlers. */
+  /** Declares a kind of resource the plugin manages, with its handlers. */
   resource(options: ResourceOptions): this {
     this.resources.set(options.kind, options);
 
     return this;
   }
 
-  /** Declares a kind of application the integration runs, with its handlers. */
+  /** Declares a kind of application the plugin runs, with its handlers. */
   application(options: ApplicationOptions): this {
     this.applications.set(options.kind, options);
 
@@ -213,14 +194,14 @@ export class Plugin {
   describe() {
     const { name, version } = this.options;
 
-    return { name, version, integration: this.integrationDefinition() };
+    return { name, version, definition: this.definition() };
   }
 
   // Routes a call to the handler of the same name on whatever the request is about: the
-  // integration itself, or one of its kinds of resource or application.
+  // plugin itself, or one of its kinds of resource or application.
   route(call: string, target: Target, kindOf: (request: AnyRequest) => string = () => '') {
     return (request: AnyRequest) => {
-      const options = target === 'integration' ? this.options : this.kind(target, kindOf(request));
+      const options = target === 'plugin' ? this.options : this.kind(target, kindOf(request));
       const handler = (options as Record<string, unknown>)[call] as ((request: AnyRequest) => unknown) | undefined;
 
       return handler
@@ -229,9 +210,8 @@ export class Plugin {
     };
   }
 
-  private integrationDefinition(): DeepPartial<IntegrationDefinition> {
+  private definition(): DeepPartial<PluginDefinition> {
     const { title, description, inputs, permissions, roles } = this.options;
-    const access = has(this.options, ACCESS_CALLS);
 
     return {
       title,
@@ -239,7 +219,6 @@ export class Plugin {
       inputs,
       permissions,
       roles,
-      capabilities: access ? [contract.IntegrationCapability.INTEGRATION_CAPABILITY_ACCESS] : [],
       resources: [...this.resources.values()].map(resourceDefinition),
       applications: [...this.applications.values()].map(applicationDefinition),
     };
@@ -252,7 +231,7 @@ export class Plugin {
   }
 }
 
-/** Creates a plugin, which is one integration. Declare its resources, then call `serve()`. */
+/** Creates a plugin. Declare its resources, then call `serve()`. */
 export function createPlugin(options: PluginOptions): Plugin {
   return new Plugin(options);
 }
@@ -287,11 +266,11 @@ function toStatus(error: unknown): grpc.ServiceError {
   return { code: grpc.status.INTERNAL, message } as grpc.ServiceError;
 }
 
-// Makes the message fields a handler relies on present, so it can read `integration.inputs.x`
-// without checking. An absent message becomes the generated type's default, and an absent Struct
-// becomes an empty object.
+// Makes the message fields a handler relies on present, so it can read `config.inputs.x` without
+// checking. An absent message becomes the generated type's default, and an absent Struct becomes an
+// empty object.
 const MESSAGES: Record<string, MessageType> = {
-  integration: contract.Integration,
+  config: contract.PluginConfig,
   resource: contract.Resource,
   application: contract.Application,
   identity: contract.Identity,
@@ -419,20 +398,13 @@ function serve(plugin: Plugin): void {
   const server = new grpc.Server();
   const anyResource = plugin.resources.size > 0;
   const anyApplication = plugin.applications.size > 0;
-  const anyAccess = has(plugin.options, ACCESS_CALLS);
 
   server.addService(contract.PluginServiceService, implement(contract.PluginServiceService, {
     describe: () => plugin.describe(),
-    // Every plugin must answer Validate; without a handler of its own, every integration is accepted.
-    validate: plugin.options.validate ? plugin.route('validate', 'integration') : () => ({}),
+    // Every plugin must answer Validate; without a handler of its own, every config is accepted.
+    validate: plugin.options.validate ? plugin.route('validate', 'plugin') : () => ({}),
+    ...routes(plugin, ACCESS_CALLS, 'plugin'),
   }));
-
-  if (anyAccess) {
-    server.addService(
-      contract.IntegrationServiceService as unknown as grpc.ServiceDefinition,
-      implement(contract.IntegrationServiceService, routes(plugin, ACCESS_CALLS, 'integration')),
-    );
-  }
 
   if (anyResource) {
     const resourceKind = (request: AnyRequest) => request.resource?.kind ?? request.kind ?? '';

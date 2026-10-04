@@ -15,16 +15,16 @@ it. Write logs to standard error.
 
 ## Test
 
-Save this as `context.json`, the integration and resources to call the plugin with:
+Save this as `context.json`, the config and resources to call the plugin with:
 
 ```json
 {
-  "integration": {
+  "config": {
     "inputs": { "base_url": "https://example.test" },
     "secrets": { "token": "secret" }
   },
   "identity": { "external_id": "someone@example.test" },
-  "role": { "name": "read" },
+  "role": { "name": "viewer", "permissions": [{ "name": "view" }] },
   "resources": [{ "kind": "item", "name": "demo", "inputs": { "description": "A demo item" } }]
 }
 ```
@@ -41,12 +41,12 @@ only the calls you name, once each and without cleaning up: `provision`, `grant-
 
 ## Where things are
 
-`main.go` declares the integration (what it needs to connect), each kind of resource and the handlers
+`main.go` declares the plugin's inputs (what it needs to connect), each kind of resource and the handlers
 Steward calls: `Provision`, `Deprovision`, `GrantAccess`, `RevokeAccess` and `GetAccess`. Handlers take
 and return the typed messages of the contract. Leave out the handlers you do not need: Steward offers
 only what you implement.
 
-To add a kind of resource, call `integration.Resource("kind", plugin.ResourceOptions{...})` again with its own
+To add a kind of resource, call `p.Resource("kind", plugin.ResourceOptions{...})` again with its own
 inputs, outputs and handlers.
 
 See the [SDK README](https://github.com/treno-dev/steward-sdk/blob/main/go/README.md) for
