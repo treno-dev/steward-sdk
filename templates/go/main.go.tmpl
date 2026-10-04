@@ -79,7 +79,7 @@ func main() {
 
 		// The settings this plugin is configured with.
 		Inputs: []*plugin.InputDefinition{
-			{Name: "base_url", Label: "Base URL", Type: plugin.TypeString, Required: true},
+			{Name: "base_url", Label: "Base URL", Description: "The base URL of the API.", Type: plugin.TypeString, Required: true},
 		},
 
 		// The credentials it is configured with.
@@ -96,8 +96,8 @@ func main() {
 		Description: "An example resource.",
 
 		// What a resource of this kind takes besides its name, which Steward stores with the kind.
-		Inputs:  []*plugin.InputDefinition{{Name: "description", Label: "Description", Type: plugin.TypeString}},
-		Outputs: []*plugin.OutputDefinition{{Name: "url", Label: "URL", Type: plugin.TypeString}},
+		Inputs:  []*plugin.InputDefinition{{Name: "description", Label: "Description", Description: "What the item is for.", Type: plugin.TypeString}},
+		Outputs: []*plugin.OutputDefinition{{Name: "url", Label: "URL", Description: "Where the item can be opened.", Type: plugin.TypeString}},
 
 		// What can be granted on this kind. Declaring permissions or roles is what makes the kind
 		// accept access, along with the three access handlers. The permissions are the pieces Steward

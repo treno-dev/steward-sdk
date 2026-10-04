@@ -81,7 +81,9 @@ plugin = create_plugin(
     title="[[.Title]]",
     description="Connects Steward to [[.Title]].",
     # The settings this plugin is configured with.
-    inputs=[{"name": "base_url", "label": "Base URL", "type": "string", "required": True}],
+    inputs=[
+        {"name": "base_url", "label": "Base URL", "description": "The base URL of the API.", "type": "string", "required": True},
+    ],
     # The credentials it is configured with.
     secrets=[{"name": "API_TOKEN", "description": "The token to call the API with.", "required": True}],
     validate=validate,
@@ -93,8 +95,8 @@ plugin.resource(
     title="Item",
     description="An example resource.",
     # What a resource of this kind takes besides its name, which Steward stores with the kind.
-    inputs=[{"name": "description", "label": "Description", "type": "string"}],
-    outputs=[{"name": "url", "label": "URL", "type": "string"}],
+    inputs=[{"name": "description", "label": "Description", "description": "What the item is for.", "type": "string"}],
+    outputs=[{"name": "url", "label": "URL", "description": "Where the item can be opened.", "type": "string"}],
     # What can be granted on this kind. Declaring permissions or roles is what makes the kind accept
     # access, along with the three access handlers. The permissions are the pieces Steward builds its
     # own roles from; the roles are the ones the tool defines itself.

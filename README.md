@@ -418,6 +418,31 @@ printed as they come, so outputs marked sensitive show in your terminal as well.
 calls are made with. Both commands exit with a failure when a check fails, so they can run in CI, and
 `--verbose` shows what the plugin writes to standard error.
 
+## Document a plugin
+
+`steward plugin docs` starts a plugin, asks it what it describes, and writes markdown reference pages from
+the answer: one for the plugin, one for each kind of resource and one for each kind of application, with
+their inputs, secrets, outputs, roles and permissions. The pages come from the plugin, so they cannot
+differ from it.
+
+```sh
+steward plugin docs node src/plugin.js
+steward plugin docs --out site python src/plugin.py
+```
+
+The pages are written to `dist/docs`, or to `--out`, inside the plugin's folder (`--dir`, the current
+directory by default). Text you write is added to the generated pages:
+
+| File                            |                                                         |
+| ------------------------------- | ------------------------------------------------------- |
+| `docs/index.md`                 | The plugin page.                                        |
+| `docs/resources/<kind>.md`      | A resource kind.                                        |
+| `docs/applications/<kind>.md`   | An application kind.                                    |
+| `examples/<kind>.json`          | A sample resource: `{ "kind", "name", "inputs" }`.      |
+
+Every file is optional. A page is the generated title and description, your text, the example, and then
+the tables. Write a `description` on every input, secret and output, because that is what the tables show.
+
 ## Developing
 
 The SDKs are generated from the contract with `buf` (remote plugins, so it needs network access).
