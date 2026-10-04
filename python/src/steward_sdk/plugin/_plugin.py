@@ -41,10 +41,8 @@ ResourceGrantAccessRequest = contract.ResourceServiceGrantAccessRequest
 ResourceRevokeAccessRequest = contract.ResourceServiceRevokeAccessRequest
 ResourceGetAccessRequest = contract.ResourceServiceGetAccessRequest
 ApplicationCreateRequest = contract.ApplicationServiceCreateRequest
-ApplicationDeleteRequest = contract.ApplicationServiceDeleteRequest
+ApplicationDestroyRequest = contract.ApplicationServiceDestroyRequest
 ApplicationDeployRequest = contract.ApplicationServiceDeployRequest
-ApplicationSetVariablesRequest = contract.ApplicationServiceSetVariablesRequest
-ApplicationListRequest = contract.ApplicationServiceListRequest
 
 # A handler returns the generated response message, or a plain dict with the fields it has
 # something to say about (names may be snake_case or camelCase), or nothing at all.
@@ -59,10 +57,8 @@ ResourceGrantAccessResponse = Union[contract.ResourceServiceGrantAccessResponse,
 ResourceRevokeAccessResponse = Union[contract.ResourceServiceRevokeAccessResponse, Mapping[str, Any], None]
 ResourceGetAccessResponse = Union[contract.ResourceServiceGetAccessResponse, Mapping[str, Any], None]
 ApplicationCreateResponse = Union[contract.ApplicationServiceCreateResponse, Mapping[str, Any], None]
-ApplicationDeleteResponse = Union[contract.ApplicationServiceDeleteResponse, Mapping[str, Any], None]
+ApplicationDestroyResponse = Union[contract.ApplicationServiceDestroyResponse, Mapping[str, Any], None]
 ApplicationDeployResponse = Union[contract.ApplicationServiceDeployResponse, Mapping[str, Any], None]
-ApplicationSetVariablesResponse = Union[contract.ApplicationServiceSetVariablesResponse, Mapping[str, Any], None]
-ApplicationListResponse = Union[contract.ApplicationServiceListResponse, Mapping[str, Any], None]
 
 # A handler takes the request and returns the response. It may be sync or async.
 Handler = Callable[[Any], Union[Any, Awaitable[Any]]]
@@ -71,7 +67,7 @@ Definitions = Sequence[Mapping[str, Any]]
 ACCESS_CALLS = ("grant_access", "revoke_access", "get_access")
 PROVISIONING_CALLS = ("provision", "deprovision")
 RESOURCE_CALLS = (*ACCESS_CALLS, *PROVISIONING_CALLS, "list")
-APPLICATION_CALLS = ("create", "delete", "deploy", "set_variables", "list")
+APPLICATION_CALLS = ("create", "destroy", "deploy")
 
 
 class PluginError(Exception):
@@ -166,13 +162,11 @@ class Plugin:
         outputs: Definitions = (),
         sources: Sequence[str] = (),
         create: Handler | None = None,
-        delete: Handler | None = None,
+        destroy: Handler | None = None,
         deploy: Handler | None = None,
-        set_variables: Handler | None = None,
-        list: Handler | None = None,
     ) -> Plugin:
         """Declares a kind of application the plugin runs, with its handlers."""
-        handlers = _handlers(create=create, delete=delete, deploy=deploy, set_variables=set_variables, list=list)
+        handlers = _handlers(create=create, destroy=destroy, deploy=deploy)
         definition = _defined(
             kind=kind,
             title=title,

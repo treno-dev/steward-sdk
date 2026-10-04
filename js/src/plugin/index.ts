@@ -87,14 +87,10 @@ export type ResourceGetAccessRequest = Complete<contract.ResourceServiceGetAcces
 export type ResourceGetAccessResponse = DeepPartial<contract.ResourceServiceGetAccessResponse>;
 export type ApplicationCreateRequest = Complete<contract.ApplicationServiceCreateRequest>;
 export type ApplicationCreateResponse = DeepPartial<contract.ApplicationServiceCreateResponse>;
-export type ApplicationDeleteRequest = Complete<contract.ApplicationServiceDeleteRequest>;
-export type ApplicationDeleteResponse = DeepPartial<contract.ApplicationServiceDeleteResponse>;
+export type ApplicationDestroyRequest = Complete<contract.ApplicationServiceDestroyRequest>;
+export type ApplicationDestroyResponse = DeepPartial<contract.ApplicationServiceDestroyResponse>;
 export type ApplicationDeployRequest = Complete<contract.ApplicationServiceDeployRequest>;
 export type ApplicationDeployResponse = DeepPartial<contract.ApplicationServiceDeployResponse>;
-export type ApplicationSetVariablesRequest = Complete<contract.ApplicationServiceSetVariablesRequest>;
-export type ApplicationSetVariablesResponse = DeepPartial<contract.ApplicationServiceSetVariablesResponse>;
-export type ApplicationListRequest = Complete<contract.ApplicationServiceListRequest>;
-export type ApplicationListResponse = DeepPartial<contract.ApplicationServiceListResponse>;
 
 // For a generated service definition, the handler of each call: it takes the request and returns
 // the response, which may leave fields out.
@@ -420,7 +416,7 @@ function serve(plugin: Plugin): void {
 
   if (anyApplication) {
     const applicationKind = (request: AnyRequest) => request.application?.kind ?? request.kind ?? '';
-    const calls = ['create', 'delete', 'deploy', 'setVariables', 'list'];
+    const calls = ['create', 'destroy', 'deploy'];
 
     server.addService(
       contract.ApplicationServiceService as unknown as grpc.ServiceDefinition,

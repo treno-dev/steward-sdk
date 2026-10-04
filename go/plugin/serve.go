@@ -223,17 +223,17 @@ func (s applicationService) Create(ctx context.Context, request *ApplicationCrea
 	return kind.Create(ctx, request)
 }
 
-func (s applicationService) Delete(ctx context.Context, request *ApplicationDeleteRequest) (*ApplicationDeleteResponse, error) {
+func (s applicationService) Destroy(ctx context.Context, request *ApplicationDestroyRequest) (*ApplicationDestroyResponse, error) {
 	kind, err := s.plugin.application(request.GetApplication().GetKind())
 	if err != nil {
 		return nil, err
 	}
 
-	if kind.Delete == nil {
-		return nil, unimplemented("delete", "application")
+	if kind.Destroy == nil {
+		return nil, unimplemented("destroy", "application")
 	}
 
-	return kind.Delete(ctx, request)
+	return kind.Destroy(ctx, request)
 }
 
 func (s applicationService) Deploy(ctx context.Context, request *ApplicationDeployRequest) (*ApplicationDeployResponse, error) {
@@ -247,30 +247,4 @@ func (s applicationService) Deploy(ctx context.Context, request *ApplicationDepl
 	}
 
 	return kind.Deploy(ctx, request)
-}
-
-func (s applicationService) SetVariables(ctx context.Context, request *ApplicationSetVariablesRequest) (*ApplicationSetVariablesResponse, error) {
-	kind, err := s.plugin.application(request.GetApplication().GetKind())
-	if err != nil {
-		return nil, err
-	}
-
-	if kind.SetVariables == nil {
-		return nil, unimplemented("set_variables", "application")
-	}
-
-	return kind.SetVariables(ctx, request)
-}
-
-func (s applicationService) List(ctx context.Context, request *ApplicationListRequest) (*ApplicationListResponse, error) {
-	kind, err := s.plugin.application(request.GetKind())
-	if err != nil {
-		return nil, err
-	}
-
-	if kind.List == nil {
-		return nil, unimplemented("list", "application")
-	}
-
-	return kind.List(ctx, request)
 }

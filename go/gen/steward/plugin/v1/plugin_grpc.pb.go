@@ -587,11 +587,9 @@ var ResourceService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	ApplicationService_Create_FullMethodName       = "/steward.plugin.v1.ApplicationService/Create"
-	ApplicationService_Delete_FullMethodName       = "/steward.plugin.v1.ApplicationService/Delete"
-	ApplicationService_Deploy_FullMethodName       = "/steward.plugin.v1.ApplicationService/Deploy"
-	ApplicationService_SetVariables_FullMethodName = "/steward.plugin.v1.ApplicationService/SetVariables"
-	ApplicationService_List_FullMethodName         = "/steward.plugin.v1.ApplicationService/List"
+	ApplicationService_Create_FullMethodName  = "/steward.plugin.v1.ApplicationService/Create"
+	ApplicationService_Destroy_FullMethodName = "/steward.plugin.v1.ApplicationService/Destroy"
+	ApplicationService_Deploy_FullMethodName  = "/steward.plugin.v1.ApplicationService/Deploy"
 )
 
 // ApplicationServiceClient is the client API for ApplicationService service.
@@ -602,10 +600,8 @@ const (
 // and open-ended variables.
 type ApplicationServiceClient interface {
 	Create(ctx context.Context, in *ApplicationServiceCreateRequest, opts ...grpc.CallOption) (*ApplicationServiceCreateResponse, error)
-	Delete(ctx context.Context, in *ApplicationServiceDeleteRequest, opts ...grpc.CallOption) (*ApplicationServiceDeleteResponse, error)
+	Destroy(ctx context.Context, in *ApplicationServiceDestroyRequest, opts ...grpc.CallOption) (*ApplicationServiceDestroyResponse, error)
 	Deploy(ctx context.Context, in *ApplicationServiceDeployRequest, opts ...grpc.CallOption) (*ApplicationServiceDeployResponse, error)
-	SetVariables(ctx context.Context, in *ApplicationServiceSetVariablesRequest, opts ...grpc.CallOption) (*ApplicationServiceSetVariablesResponse, error)
-	List(ctx context.Context, in *ApplicationServiceListRequest, opts ...grpc.CallOption) (*ApplicationServiceListResponse, error)
 }
 
 type applicationServiceClient struct {
@@ -626,10 +622,10 @@ func (c *applicationServiceClient) Create(ctx context.Context, in *ApplicationSe
 	return out, nil
 }
 
-func (c *applicationServiceClient) Delete(ctx context.Context, in *ApplicationServiceDeleteRequest, opts ...grpc.CallOption) (*ApplicationServiceDeleteResponse, error) {
+func (c *applicationServiceClient) Destroy(ctx context.Context, in *ApplicationServiceDestroyRequest, opts ...grpc.CallOption) (*ApplicationServiceDestroyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ApplicationServiceDeleteResponse)
-	err := c.cc.Invoke(ctx, ApplicationService_Delete_FullMethodName, in, out, cOpts...)
+	out := new(ApplicationServiceDestroyResponse)
+	err := c.cc.Invoke(ctx, ApplicationService_Destroy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -646,26 +642,6 @@ func (c *applicationServiceClient) Deploy(ctx context.Context, in *ApplicationSe
 	return out, nil
 }
 
-func (c *applicationServiceClient) SetVariables(ctx context.Context, in *ApplicationServiceSetVariablesRequest, opts ...grpc.CallOption) (*ApplicationServiceSetVariablesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ApplicationServiceSetVariablesResponse)
-	err := c.cc.Invoke(ctx, ApplicationService_SetVariables_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *applicationServiceClient) List(ctx context.Context, in *ApplicationServiceListRequest, opts ...grpc.CallOption) (*ApplicationServiceListResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ApplicationServiceListResponse)
-	err := c.cc.Invoke(ctx, ApplicationService_List_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // ApplicationServiceServer is the server API for ApplicationService service.
 // All implementations must embed UnimplementedApplicationServiceServer
 // for forward compatibility.
@@ -674,10 +650,8 @@ func (c *applicationServiceClient) List(ctx context.Context, in *ApplicationServ
 // and open-ended variables.
 type ApplicationServiceServer interface {
 	Create(context.Context, *ApplicationServiceCreateRequest) (*ApplicationServiceCreateResponse, error)
-	Delete(context.Context, *ApplicationServiceDeleteRequest) (*ApplicationServiceDeleteResponse, error)
+	Destroy(context.Context, *ApplicationServiceDestroyRequest) (*ApplicationServiceDestroyResponse, error)
 	Deploy(context.Context, *ApplicationServiceDeployRequest) (*ApplicationServiceDeployResponse, error)
-	SetVariables(context.Context, *ApplicationServiceSetVariablesRequest) (*ApplicationServiceSetVariablesResponse, error)
-	List(context.Context, *ApplicationServiceListRequest) (*ApplicationServiceListResponse, error)
 	mustEmbedUnimplementedApplicationServiceServer()
 }
 
@@ -691,17 +665,11 @@ type UnimplementedApplicationServiceServer struct{}
 func (UnimplementedApplicationServiceServer) Create(context.Context, *ApplicationServiceCreateRequest) (*ApplicationServiceCreateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
 }
-func (UnimplementedApplicationServiceServer) Delete(context.Context, *ApplicationServiceDeleteRequest) (*ApplicationServiceDeleteResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
+func (UnimplementedApplicationServiceServer) Destroy(context.Context, *ApplicationServiceDestroyRequest) (*ApplicationServiceDestroyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Destroy not implemented")
 }
 func (UnimplementedApplicationServiceServer) Deploy(context.Context, *ApplicationServiceDeployRequest) (*ApplicationServiceDeployResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Deploy not implemented")
-}
-func (UnimplementedApplicationServiceServer) SetVariables(context.Context, *ApplicationServiceSetVariablesRequest) (*ApplicationServiceSetVariablesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SetVariables not implemented")
-}
-func (UnimplementedApplicationServiceServer) List(context.Context, *ApplicationServiceListRequest) (*ApplicationServiceListResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedApplicationServiceServer) mustEmbedUnimplementedApplicationServiceServer() {}
 func (UnimplementedApplicationServiceServer) testEmbeddedByValue()                            {}
@@ -742,20 +710,20 @@ func _ApplicationService_Create_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApplicationService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ApplicationServiceDeleteRequest)
+func _ApplicationService_Destroy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplicationServiceDestroyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ApplicationServiceServer).Delete(ctx, in)
+		return srv.(ApplicationServiceServer).Destroy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ApplicationService_Delete_FullMethodName,
+		FullMethod: ApplicationService_Destroy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApplicationServiceServer).Delete(ctx, req.(*ApplicationServiceDeleteRequest))
+		return srv.(ApplicationServiceServer).Destroy(ctx, req.(*ApplicationServiceDestroyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -778,42 +746,6 @@ func _ApplicationService_Deploy_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ApplicationService_SetVariables_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ApplicationServiceSetVariablesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ApplicationServiceServer).SetVariables(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ApplicationService_SetVariables_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApplicationServiceServer).SetVariables(ctx, req.(*ApplicationServiceSetVariablesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ApplicationService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ApplicationServiceListRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ApplicationServiceServer).List(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ApplicationService_List_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ApplicationServiceServer).List(ctx, req.(*ApplicationServiceListRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // ApplicationService_ServiceDesc is the grpc.ServiceDesc for ApplicationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -826,20 +758,12 @@ var ApplicationService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ApplicationService_Create_Handler,
 		},
 		{
-			MethodName: "Delete",
-			Handler:    _ApplicationService_Delete_Handler,
+			MethodName: "Destroy",
+			Handler:    _ApplicationService_Destroy_Handler,
 		},
 		{
 			MethodName: "Deploy",
 			Handler:    _ApplicationService_Deploy_Handler,
-		},
-		{
-			MethodName: "SetVariables",
-			Handler:    _ApplicationService_SetVariables_Handler,
-		},
-		{
-			MethodName: "List",
-			Handler:    _ApplicationService_List_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

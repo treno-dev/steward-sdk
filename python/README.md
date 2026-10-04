@@ -137,6 +137,26 @@ plugin = create_plugin(
 
 `invite` stands for a call to the tool's own API.
 
+A resource kind takes the same three handlers and its own `roles` and `permissions`. Its requests also
+carry the `resource`:
+
+```python
+async def grant_access(request: ResourceGrantAccessRequest) -> ResourceGrantAccessResponse:
+    await add_collaborator(request.config, request.resource.name, request.identity.external_id, request.role.name)
+
+    return {"role": plain(request.role), "permissions": [plain(item) for item in request.permissions]}
+
+
+plugin.resource(
+    kind="repository",
+    permissions=[{"name": "pull"}, {"name": "push"}],
+    roles=[{"name": "viewer", "title": "Viewer"}, {"name": "editor", "title": "Editor"}],
+    grant_access=grant_access,
+    revoke_access=revoke_access,
+    get_access=get_access,
+)
+```
+
 Declaring `roles` or `permissions` is what says that the plugin, or the kind, supports access. They are
 two separate lists:
 
@@ -170,7 +190,7 @@ what can be granted.
 | `provision`, `deprovision`                                     | be created and removed                                                                                                       |
 | `list`                                                         | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
 | `roles` or `permissions`, with `grant_access`, `revoke_access`, `get_access` | have access granted (resources and the plugin)                                                                 |
-| `create`, `delete`, `deploy`, `set_variables`, `list`          | be run as an application                                                                                                     |
+| `create`, `destroy`, `deploy`                                  | be run as an application                                                                                                     |
 
 ## Handlers
 
@@ -194,8 +214,9 @@ plain one runs in a thread, so blocking calls do not stall the plugin).
   and sends on every later call. `provision` receives them with the `inputs` and returns only the
   `outputs`, such as a URL or an id the tool assigned. An identity has `external_id`, `name`, `ulid`
   and `attrs`; those that are optional report whether they were set with `HasField`.
-- **Variables.** An application's variables each carry `sensitive`, `sealed` and `locked`. Refuse to
-  change or remove a locked variable.
+- **Variables.** An application's variables each carry `sensitive`, `sealed` and `locked`. A `deploy`
+  carries the application's full set of variables, so changing them is a deploy. Fail it with
+  `FAILED_PRECONDITION` if it would change or remove a locked variable.
 
 ## Errors
 

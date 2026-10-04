@@ -83,11 +83,9 @@ type ApplicationOptions struct {
 	// Sources are the source types it can be deployed from: "github", "registry", "s3" or "raw".
 	Sources []string
 
-	Create       func(context.Context, *ApplicationCreateRequest) (*ApplicationCreateResponse, error)
-	Delete       func(context.Context, *ApplicationDeleteRequest) (*ApplicationDeleteResponse, error)
-	Deploy       func(context.Context, *ApplicationDeployRequest) (*ApplicationDeployResponse, error)
-	SetVariables func(context.Context, *ApplicationSetVariablesRequest) (*ApplicationSetVariablesResponse, error)
-	List         func(context.Context, *ApplicationListRequest) (*ApplicationListResponse, error)
+	Create  func(context.Context, *ApplicationCreateRequest) (*ApplicationCreateResponse, error)
+	Destroy func(context.Context, *ApplicationDestroyRequest) (*ApplicationDestroyResponse, error)
+	Deploy  func(context.Context, *ApplicationDeployRequest) (*ApplicationDeployResponse, error)
 }
 
 // Plugin is what a plugin author builds. Declare its resources and applications, then call Serve.

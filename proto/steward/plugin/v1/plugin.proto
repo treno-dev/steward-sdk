@@ -507,14 +507,17 @@ message ApplicationServiceCreateResponse {
 }
 
 // Idempotent: removing an application that is already gone succeeds.
-message ApplicationServiceDeleteRequest {
+message ApplicationServiceDestroyRequest {
   PluginConfig config = 1;
   Application application = 2;
 }
 
-message ApplicationServiceDeleteResponse {}
+message ApplicationServiceDestroyResponse {}
 
-// Deploys the application from a source, replacing what is running.
+// Deploys the application from a source, replacing what is running. `application.variables` is the
+// full set of variables to run it with, so a change to the variables is a deploy: a variable missing
+// from it is removed. A locked variable cannot be changed or removed, and the call fails with
+// FAILED_PRECONDITION.
 message ApplicationServiceDeployRequest {
   PluginConfig config = 1;
   Application application = 2;
@@ -526,34 +529,6 @@ message ApplicationServiceDeployRequest {
 message ApplicationServiceDeployResponse {
   // The application after the deploy was started, with its outputs.
   Application application = 1;
-}
-
-// Changes an application's variables without touching the others.
-message ApplicationServiceSetVariablesRequest {
-  PluginConfig config = 1;
-  Application application = 2;
-
-  // Variables to add or change.
-  repeated Variable set = 3;
-
-  // Names of variables to remove. A locked variable cannot be changed or removed: the call fails
-  // with FAILED_PRECONDITION.
-  repeated string remove = 4;
-}
-
-message ApplicationServiceSetVariablesResponse {}
-
-message ApplicationServiceListRequest {
-  PluginConfig config = 1;
-  string kind = 2;
-  string page_token = 3;
-}
-
-message ApplicationServiceListResponse {
-  repeated Application applications = 1;
-
-  // Empty on the last page.
-  string next_page_token = 2;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -592,8 +567,6 @@ service ResourceService {
 // and open-ended variables.
 service ApplicationService {
   rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse);
-  rpc Delete(ApplicationServiceDeleteRequest) returns (ApplicationServiceDeleteResponse);
+  rpc Destroy(ApplicationServiceDestroyRequest) returns (ApplicationServiceDestroyResponse);
   rpc Deploy(ApplicationServiceDeployRequest) returns (ApplicationServiceDeployResponse);
-  rpc SetVariables(ApplicationServiceSetVariablesRequest) returns (ApplicationServiceSetVariablesResponse);
-  rpc List(ApplicationServiceListRequest) returns (ApplicationServiceListResponse);
 }

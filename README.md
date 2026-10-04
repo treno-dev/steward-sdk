@@ -53,7 +53,7 @@ Those calls fall into three kinds of work. A plugin supports whichever fit its s
 
 - **Resource provisioning:** create and remove resources, and report what they produced, such as a URL
   or an id. Optionally, list resources that already exist so they can be brought under Steward.
-- **Application management:** create, deploy and delete applications, which are run from a source
+- **Application management:** create, deploy and destroy applications, which are run from a source
   (a GitHub repository, a container image, an S3 archive or a path) and have variables, such as a web app
   and its environment.
 - **Access:** grant, revoke and report someone's roles, on the system as a whole (membership of the
@@ -208,6 +208,21 @@ const plugin = createPlugin({
 
     return { errors };
   },
+
+  // Access to the tool as a whole, such as membership of an organization.
+  roles: [{ name: "member", title: "Member" }],
+
+  async grantAccess({ config, identity, role }) {
+    return { role };
+  },
+
+  async revokeAccess({ config, identity }) {
+    return {};
+  },
+
+  async getAccess({ config, identity }) {
+    return { roles: [] };
+  },
 });
 
 // A kind of resource it manages.
@@ -233,9 +248,9 @@ plugin.resource({
     return {};
   },
 
-  // Give an identity a role on the resource. The role is always set, and `permissions` lists the pieces
-  // of a role Steward composed. Return what the tool applied.
-  async grantAccess({ identity, role, permissions }) {
+  // Access to one resource: give an identity a role on it. The role is always set, and `permissions`
+  // lists the pieces of a role Steward composed. Return what the tool applied.
+  async grantAccess({ config, resource, identity, role, permissions }) {
     return { role, permissions };
   },
 

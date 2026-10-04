@@ -138,6 +138,34 @@ const plugin = createPlugin({
 
 `invite`, `removeFromOrganization` and `findMembership` stand for calls to the tool's own API.
 
+A resource kind takes the same three handlers and its own `roles` and `permissions`. Its requests also
+carry the `resource`:
+
+```js
+plugin.resource({
+  kind: 'repository',
+
+  permissions: [{ name: 'pull' }, { name: 'push' }],
+  roles: [{ name: 'viewer', title: 'Viewer' }, { name: 'editor', title: 'Editor' }],
+
+  grantAccess: async ({ config, resource, identity, role, permissions }) => {
+    await addCollaborator(config, resource.name, identity.externalId, role.name);
+
+    return { role, permissions };
+  },
+  revokeAccess: async ({ config, resource, identity }) => {
+    await removeCollaborator(config, resource.name, identity.externalId);
+
+    return {};
+  },
+  getAccess: async ({ config, resource, identity }) => {
+    const collaborator = await findCollaborator(config, resource.name, identity);
+
+    return { roles: collaborator ? [{ name: collaborator.role }] : [] };
+  },
+});
+```
+
 Declaring `roles` or `permissions` is what says that the plugin, or the kind, supports access. They are
 two separate lists:
 
@@ -171,7 +199,7 @@ Steward what can be granted.
 | `provision`, `deprovision` | be created and removed |
 | `list` | be discovered (optional: Steward keeps track of what it creates, so `list` is only for finding resources that already exist) |
 | `roles` or `permissions`, with `grantAccess`, `revokeAccess`, `getAccess` | have access granted (resources and the plugin) |
-| `create`, `delete`, `deploy`, `setVariables`, `list` | be run as an application |
+| `create`, `destroy`, `deploy` | be run as an application |
 
 ## Handlers
 
@@ -193,8 +221,9 @@ responses are typed from the contract.
 - **Access.** A grant returns the `role` and `permissions` as the tool applied them, an `id` for the
   grant if the tool has one, and `pending: true` while it needs the person to act, such as accepting
   an invitation.
-- **Variables.** An application's variables each carry `sensitive`, `sealed` and `locked`. Refuse to
-  change or remove a locked variable.
+- **Variables.** An application's variables each carry `sensitive`, `sealed` and `locked`. A `deploy`
+  carries the application's full set of variables, so changing them is a deploy. Fail it with
+  `FAILED_PRECONDITION` if it would change or remove a locked variable.
 
 ## Errors
 

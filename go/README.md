@@ -92,6 +92,33 @@ two separate lists:
 - **`Permissions`** are the pieces Steward builds its own roles from. A permission is a `Name` with an
   optional `Level`.
 
+```go
+p := plugin.New(plugin.Options{
+	Name:         "github",
+	Version:      "0.1.0",
+	Inputs:       inputs,
+	Roles:        []*plugin.RoleDefinition{{Name: "member", Title: "Member"}, {Name: "owner", Title: "Owner"}},
+	GrantAccess:  inviteMember,
+	RevokeAccess: removeMember,
+	GetAccess:    findMember,
+})
+
+p.Resource("repository", plugin.ResourceOptions{
+	Permissions:  []*plugin.PermissionDefinition{{Name: "pull"}, {Name: "push"}},
+	Roles:        []*plugin.RoleDefinition{{Name: "viewer", Title: "Viewer"}, {Name: "editor", Title: "Editor"}},
+	GrantAccess:  addCollaborator,
+	RevokeAccess: removeCollaborator,
+	GetAccess:    findCollaborator,
+})
+```
+
+The plugin's handlers take the `Plugin…` messages and a resource's take the `Resource…` ones:
+
+```go
+func inviteMember(ctx context.Context, request *plugin.PluginGrantAccessRequest) (*plugin.PluginGrantAccessResponse, error)
+func addCollaborator(ctx context.Context, request *plugin.ResourceGrantAccessRequest) (*plugin.ResourceGrantAccessResponse, error)
+```
+
 Handlers receive the `Identity` (`ExternalId`, `Name`, `Attrs`) and the `Role` to apply, and a resource
 call also gets the `Resource` (`Kind`, `Name`). The `Role` is always set. For a role Steward composed
 from your permissions, `Permissions` lists its pieces too, for you to apply as far as the tool allows.
@@ -118,7 +145,7 @@ what can be granted.
 | `Provision`, `Deprovision` | be created and removed |
 | `List` | be discovered (optional: Steward keeps track of what it creates, so `List` is only for finding resources that already exist) |
 | `Roles` or `Permissions`, with `GrantAccess`, `RevokeAccess`, `GetAccess` | have access granted (resources and the plugin) |
-| `Create`, `Delete`, `Deploy`, `SetVariables`, `List` | be run as an application |
+| `Create`, `Destroy`, `Deploy` | be run as an application |
 
 ## Handlers
 
@@ -143,8 +170,9 @@ generated contract messages, re-exported by the package so a plugin imports one 
 - **Resources and identities.** A resource is identified by its `Kind` and `Name`, which Steward stores
   and sends on every later call. `Provision` receives them with the `Inputs` and returns only the
   `Outputs`, such as a URL or an id the tool assigned.
-- **Variables.** An application's variables each carry `Sensitive`, `Sealed` and `Locked`. Refuse to
-  change or remove a locked variable.
+- **Variables.** An application's variables each carry `Sensitive`, `Sealed` and `Locked`. A `Deploy`
+  carries the application's full set of variables, so changing them is a deploy. Fail it with
+  `FAILED_PRECONDITION` if it would change or remove a locked variable.
 
 ## Errors
 

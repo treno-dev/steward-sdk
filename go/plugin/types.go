@@ -36,7 +36,7 @@ func Value(value any) *structpb.Value {
 // Requests and responses are named for what they handle (the entity, then the call).
 type (
 	PluginConfig      = pluginv1.PluginConfig
-	Resource        = pluginv1.Resource
+	Resource          = pluginv1.Resource
 	Application       = pluginv1.Application
 	ApplicationSource = pluginv1.ApplicationSource
 	Variable          = pluginv1.Variable
@@ -72,16 +72,12 @@ type (
 	ResourceGetAccessRequest     = pluginv1.ResourceServiceGetAccessRequest
 	ResourceGetAccessResponse    = pluginv1.ResourceServiceGetAccessResponse
 
-	ApplicationCreateRequest        = pluginv1.ApplicationServiceCreateRequest
-	ApplicationCreateResponse       = pluginv1.ApplicationServiceCreateResponse
-	ApplicationDeleteRequest        = pluginv1.ApplicationServiceDeleteRequest
-	ApplicationDeleteResponse       = pluginv1.ApplicationServiceDeleteResponse
-	ApplicationDeployRequest        = pluginv1.ApplicationServiceDeployRequest
-	ApplicationDeployResponse       = pluginv1.ApplicationServiceDeployResponse
-	ApplicationSetVariablesRequest  = pluginv1.ApplicationServiceSetVariablesRequest
-	ApplicationSetVariablesResponse = pluginv1.ApplicationServiceSetVariablesResponse
-	ApplicationListRequest          = pluginv1.ApplicationServiceListRequest
-	ApplicationListResponse         = pluginv1.ApplicationServiceListResponse
+	ApplicationCreateRequest   = pluginv1.ApplicationServiceCreateRequest
+	ApplicationCreateResponse  = pluginv1.ApplicationServiceCreateResponse
+	ApplicationDestroyRequest  = pluginv1.ApplicationServiceDestroyRequest
+	ApplicationDestroyResponse = pluginv1.ApplicationServiceDestroyResponse
+	ApplicationDeployRequest   = pluginv1.ApplicationServiceDeployRequest
+	ApplicationDeployResponse  = pluginv1.ApplicationServiceDeployResponse
 )
 
 // The types an InputDefinition or OutputDefinition can have.
