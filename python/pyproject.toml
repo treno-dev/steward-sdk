@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "treno-dev-steward-sdk"
-version = "0.1.0rc2"
+version = "0.1.0rc3"
 description = "The Steward SDK for Python: write Steward plugins"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,7 +20,12 @@ Repository = "https://github.com/treno-dev/steward-sdk"
 [project.optional-dependencies]
 dev = ["build"]
 
+# The generated contract is not committed, so git ignores it, and a build leaves out what git ignores
+# unless it is listed here. `python -m build` makes the source distribution first and builds the wheel
+# from that, so both have to carry it.
+[tool.hatch.build.targets.sdist]
+artifacts = ["src/steward_sdk/_gen"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/steward_sdk"]
-# The generated contract is not committed, so it is not in git; the wheel still carries it.
 artifacts = ["src/steward_sdk/_gen"]

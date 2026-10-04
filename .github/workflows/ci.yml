@@ -77,6 +77,15 @@ jobs:
       - run: buf generate
       - run: python -m build
 
+      # What is published is the built wheel, not the source tree, so install that in a clean environment
+      # and import it. A wheel that left out the generated messages would pass every other step.
+      - name: The built wheel works on its own
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel"
+          "$RUNNER_TEMP/wheel/bin/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel/bin/python" -c "from steward_sdk.plugin import create_plugin"
+
   go:
     name: Go
     runs-on: ubuntu-latest
