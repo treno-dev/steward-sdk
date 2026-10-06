@@ -1,0 +1,12 @@
+name: Publish
+on:
+  push:
+    tags: ['v*']
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    uses: treno-dev/steward-gh-action/.github/workflows/publish.yml@v1
+    with:
+      pluginId: '[[.PluginID]]'
