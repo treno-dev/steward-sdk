@@ -42,7 +42,7 @@ from steward_sdk.plugin import create_plugin
 
 
 async def provision(request):
-    base_url = request.config.inputs["base_url"]
+    base_url = request.integration.inputs["base_url"]
 
     return {"outputs": {"url": f"{base_url}/items/{request.name}"}}
 
@@ -82,7 +82,7 @@ for example both Cloudflare and AWS, take the credentials for each as secrets.
 | `title`, `description`                                                | Shown in Steward.                                                                                                                                    |
 | `inputs`                                                              | The settings the plugin is configured with.                                                                                                          |
 | `secrets`                                                             | The credentials it is configured with, such as an API token.                                                                                         |
-| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every config is accepted. |
+| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every integration is accepted. |
 | `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the plugin as a whole, such as membership of an organization.                                                                              |
 
 **A resource**, with `plugin.resource(kind=..., ...)`, and **an application**, with
@@ -125,7 +125,7 @@ For the plugin it looks like this:
 async def grant_access(request: PluginGrantAccessRequest) -> PluginGrantAccessResponse:
     identity = request.identity
     email = identity.external_id or plain(identity.attrs)["email"]
-    invitation = await invite(request.config, email, request.role.name)
+    invitation = await invite(request.integration, email, request.role.name)
 
     return {"id": invitation.id, "role": request.role, "pending": True}  # an invitation is not access until accepted
 
@@ -148,7 +148,7 @@ carry the `resource`:
 
 ```python
 async def grant_access(request: ResourceGrantAccessRequest) -> ResourceGrantAccessResponse:
-    await add_collaborator(request.config, request.resource.name, request.identity.external_id, request.role.name)
+    await add_collaborator(request.integration, request.resource.name, request.identity.external_id, request.role.name)
 
     return {"role": plain(request.role), "permissions": [plain(item) for item in request.permissions]}
 
@@ -209,9 +209,9 @@ plain one runs in a thread, so blocking calls do not stall the plugin).
 - **Responses** are a response message or a plain dict with the fields you have something to say
   about (snake_case or camelCase). Messages inside it, such as the `role` you were given, can be used
   as they are. Returning nothing is an empty response.
-- **Inputs and secrets.** `config.inputs` and `inputs` hold the values of the inputs, keyed by input
+- **Inputs and secrets.** `integration.inputs` and `inputs` hold the values of the inputs, keyed by input
   name; numbers arrive as floats. The values of secrets arrive apart from them, keyed by secret name,
-  in `config.secrets` (and a resource's or application's `secrets`), a plain `dict`-like of strings.
+  in `integration.secrets` (and a resource's or application's `secrets`), a plain `dict`-like of strings.
   Never store them.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating what
   exists, or removing what is gone, simply succeeds. Return the result of the change (the `outputs`,

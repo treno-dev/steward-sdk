@@ -4,8 +4,8 @@ package steward.plugin.v1;
 
 import "google/protobuf/struct.proto";
 
-// The plugin contract. Every plugin serves PluginService: it describes itself, validates its config
-// and, when it declares roles or permissions, grants access as a whole. A plugin that has resources
+// The plugin contract. Every plugin serves PluginService: it describes itself, validates an integration
+// of itself and, when it declares roles or permissions, grants access as a whole. A plugin that has resources
 // also serves ResourceService, and one that runs applications serves ApplicationService. A plugin
 // offers a call by implementing it. A call it does not offer fails with UNIMPLEMENTED, and Steward
 // treats that as not offered. Within v1 the contract is additive only.
@@ -20,9 +20,10 @@ import "google/protobuf/struct.proto";
 // Shared messages
 // ---------------------------------------------------------------------------------------------
 
-// What a plugin is configured with for a call: its inputs and its secrets, which are kept, sent and
-// logged separately. A plugin must not persist the secrets.
-message PluginConfig {
+// An integration is an instance of a plugin: the plugin with the inputs and the secrets it was set up with, such as a
+// GitHub plugin for one organization. Every call carries the integration it is for. The inputs and the secrets are kept,
+// sent and logged separately, and a plugin must not persist the secrets.
+message Integration {
   // Values for the inputs declared in PluginDefinition.inputs, keyed by input name.
   google.protobuf.Struct inputs = 1;
 
@@ -44,7 +45,7 @@ message Resource {
   google.protobuf.Struct inputs = 3;
 
   // Values for the secrets declared in ResourceDefinition.secrets, keyed by secret name. Resolved
-  // by the runner for this call only, like PluginConfig.secrets.
+  // by the runner for this call only, like Integration.secrets.
   map<string, string> secrets = 4;
 
   // Values the resource produced, as declared in ResourceDefinition.outputs, keyed by output name.
@@ -202,7 +203,7 @@ message PluginDefinition {
 }
 
 // One setting a plugin, a resource or an application takes, declared the way a variable is: a name
-// and a type, with the value passed separately, keyed by `name`, in PluginConfig.inputs,
+// and a type, with the value passed separately, keyed by `name`, in Integration.inputs,
 // Resource.inputs or Application.inputs.
 message InputDefinition {
   string name = 1;
@@ -309,17 +310,17 @@ message RoleDefinition {
 }
 
 message ValidateRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
 }
 
 message ValidateResponse {
-  // Problems with the inputs or credentials that the user can fix. Empty when the config is good.
+  // Problems with the inputs or credentials that the user can fix. Empty when the integration is good.
   // Failures of the call itself are returned as gRPC errors instead.
   repeated ValidationError errors = 1;
 }
 
 message ValidationError {
-  // The input the error is about. Empty when it is about the config as a whole.
+  // The input the error is about. Empty when it is about the integration as a whole.
   string field = 1;
   string message = 2;
 }
@@ -329,7 +330,7 @@ message ValidationError {
 //
 // Idempotent: granting what is already granted succeeds.
 message PluginServiceGrantAccessRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Identity identity = 2;
 
   // Always set. For a role Steward composed, `permissions` are its pieces, which the plugin
@@ -356,7 +357,7 @@ message PluginServiceGrantAccessResponse {
 // Idempotent: revoking what is already absent succeeds. Steward works out overlap between roles
 // before it sends a revoke, so the role here is safe to remove in full.
 message PluginServiceRevokeAccessRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Identity identity = 2;
   Role role = 3;
   repeated Permission permissions = 5;
@@ -370,7 +371,7 @@ message PluginServiceRevokeAccessResponse {}
 // Asks what an identity holds on the plugin now, for example to skip an invitation to someone who
 // is already a member, or to find drift.
 message PluginServiceGetAccessRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Identity identity = 2;
 }
 
@@ -396,7 +397,7 @@ message PluginServiceGetAccessResponse {
 //
 // Idempotent: granting what is already granted succeeds.
 message ResourceServiceGrantAccessRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Resource resource = 2;
   Identity identity = 3;
   Role role = 4;
@@ -421,7 +422,7 @@ message ResourceServiceGrantAccessResponse {
 // Idempotent: revoking what is already absent succeeds. Steward works out overlap between roles
 // before it sends a revoke, so the role here is safe to remove in full.
 message ResourceServiceRevokeAccessRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Resource resource = 2;
   Identity identity = 3;
   Role role = 4;
@@ -435,7 +436,7 @@ message ResourceServiceRevokeAccessResponse {}
 
 // Asks what an identity holds on a resource now.
 message ResourceServiceGetAccessRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Resource resource = 2;
   Identity identity = 3;
 }
@@ -452,7 +453,7 @@ message ResourceServiceGetAccessResponse {
 // Idempotent: provisioning something that already exists with the same kind and name succeeds, and
 // still returns its outputs. Steward works out what changed by comparing the state it stores.
 message ResourceServiceProvisionRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
 
   // The kind to create, as declared in PluginDefinition.resources.
   string kind = 2;
@@ -477,14 +478,14 @@ message ResourceServiceProvisionResponse {
 
 // Idempotent: removing something that is already gone succeeds.
 message ResourceServiceDeprovisionRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Resource resource = 2;
 }
 
 message ResourceServiceDeprovisionResponse {}
 
 message ResourceServiceListRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   string kind = 2;
   string page_token = 3;
 }
@@ -502,7 +503,7 @@ message ResourceServiceListResponse {
 
 // Idempotent: creating an application that already exists with the same identity returns it.
 message ApplicationServiceCreateRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
 
   // A kind declared in PluginDefinition.applications, with its inputs and secrets, where it is
   // deployed from, and its starting variables.
@@ -520,7 +521,7 @@ message ApplicationServiceCreateResponse {
 
 // Idempotent: removing an application that is already gone succeeds.
 message ApplicationServiceDestroyRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Application application = 2;
 }
 
@@ -531,7 +532,7 @@ message ApplicationServiceDestroyResponse {}
 // from it is removed. A locked variable cannot be changed or removed, and the call fails with
 // FAILED_PRECONDITION.
 message ApplicationServiceDeployRequest {
-  PluginConfig config = 1;
+  Integration integration = 1;
   Application application = 2;
   // What to deploy. Unset means redeploy from the application's current source.
   ApplicationSource source = 3;
@@ -553,7 +554,7 @@ service PluginService {
   // Describes the plugin: what it needs (its inputs) and the resources it manages.
   rpc Describe(DescribeRequest) returns (DescribeResponse);
 
-  // Checks a config, for example that the inputs are valid and the credentials work.
+  // Checks an integration, for example that the inputs are valid and the credentials work.
   rpc Validate(ValidateRequest) returns (ValidateResponse);
 
   // Access to the plugin as a whole: giving identities roles on it, taking them away, and checking

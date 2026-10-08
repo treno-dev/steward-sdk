@@ -22,9 +22,10 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// What a plugin is configured with for a call: its inputs and its secrets, which are kept, sent and
-// logged separately. A plugin must not persist the secrets.
-type PluginConfig struct {
+// An integration is an instance of a plugin: the plugin with the inputs and the secrets it was set up with, such as a
+// GitHub plugin for one organization. Every call carries the integration it is for. The inputs and the secrets are kept,
+// sent and logged separately, and a plugin must not persist the secrets.
+type Integration struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Values for the inputs declared in PluginDefinition.inputs, keyed by input name.
 	Inputs *structpb.Struct `protobuf:"bytes,1,opt,name=inputs,proto3" json:"inputs,omitempty"`
@@ -35,20 +36,20 @@ type PluginConfig struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PluginConfig) Reset() {
-	*x = PluginConfig{}
+func (x *Integration) Reset() {
+	*x = Integration{}
 	mi := &file_steward_plugin_v1_plugin_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PluginConfig) String() string {
+func (x *Integration) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PluginConfig) ProtoMessage() {}
+func (*Integration) ProtoMessage() {}
 
-func (x *PluginConfig) ProtoReflect() protoreflect.Message {
+func (x *Integration) ProtoReflect() protoreflect.Message {
 	mi := &file_steward_plugin_v1_plugin_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -60,19 +61,19 @@ func (x *PluginConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PluginConfig.ProtoReflect.Descriptor instead.
-func (*PluginConfig) Descriptor() ([]byte, []int) {
+// Deprecated: Use Integration.ProtoReflect.Descriptor instead.
+func (*Integration) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *PluginConfig) GetInputs() *structpb.Struct {
+func (x *Integration) GetInputs() *structpb.Struct {
 	if x != nil {
 		return x.Inputs
 	}
 	return nil
 }
 
-func (x *PluginConfig) GetSecrets() map[string]string {
+func (x *Integration) GetSecrets() map[string]string {
 	if x != nil {
 		return x.Secrets
 	}
@@ -90,7 +91,7 @@ type Resource struct {
 	// Values for the inputs declared in ResourceDefinition.inputs, keyed by input name.
 	Inputs *structpb.Struct `protobuf:"bytes,3,opt,name=inputs,proto3" json:"inputs,omitempty"`
 	// Values for the secrets declared in ResourceDefinition.secrets, keyed by secret name. Resolved
-	// by the runner for this call only, like PluginConfig.secrets.
+	// by the runner for this call only, like Integration.secrets.
 	Secrets map[string]string `protobuf:"bytes,4,rep,name=secrets,proto3" json:"secrets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Values the resource produced, as declared in ResourceDefinition.outputs, keyed by output name.
 	// Set by the plugin when it lists a resource; ignored on calls. Provision returns its outputs
@@ -821,7 +822,7 @@ func (x *PluginDefinition) GetApplications() []*ApplicationDefinition {
 }
 
 // One setting a plugin, a resource or an application takes, declared the way a variable is: a name
-// and a type, with the value passed separately, keyed by `name`, in PluginConfig.inputs,
+// and a type, with the value passed separately, keyed by `name`, in Integration.inputs,
 // Resource.inputs or Application.inputs.
 type InputDefinition struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
@@ -1405,7 +1406,7 @@ func (x *RoleDefinition) GetDescription() string {
 
 type ValidateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1440,16 +1441,16 @@ func (*ValidateRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *ValidateRequest) GetConfig() *PluginConfig {
+func (x *ValidateRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
 
 type ValidateResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Problems with the inputs or credentials that the user can fix. Empty when the config is good.
+	// Problems with the inputs or credentials that the user can fix. Empty when the integration is good.
 	// Failures of the call itself are returned as gRPC errors instead.
 	Errors        []*ValidationError `protobuf:"bytes,1,rep,name=errors,proto3" json:"errors,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1495,7 +1496,7 @@ func (x *ValidateResponse) GetErrors() []*ValidationError {
 
 type ValidationError struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The input the error is about. Empty when it is about the config as a whole.
+	// The input the error is about. Empty when it is about the integration as a whole.
 	Field         string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
 	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1551,9 +1552,9 @@ func (x *ValidationError) GetMessage() string {
 //
 // Idempotent: granting what is already granted succeeds.
 type PluginServiceGrantAccessRequest struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Config   *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
-	Identity *Identity              `protobuf:"bytes,2,opt,name=identity,proto3" json:"identity,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Integration *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
+	Identity    *Identity              `protobuf:"bytes,2,opt,name=identity,proto3" json:"identity,omitempty"`
 	// Always set. For a role Steward composed, `permissions` are its pieces, which the plugin
 	// applies as far as the tool allows. Empty for a role the tool defines.
 	Role          *Role         `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
@@ -1592,9 +1593,9 @@ func (*PluginServiceGrantAccessRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{21}
 }
 
-func (x *PluginServiceGrantAccessRequest) GetConfig() *PluginConfig {
+func (x *PluginServiceGrantAccessRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -1698,7 +1699,7 @@ func (x *PluginServiceGrantAccessResponse) GetPending() bool {
 // before it sends a revoke, so the role here is safe to remove in full.
 type PluginServiceRevokeAccessRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
-	Config      *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Identity    *Identity              `protobuf:"bytes,2,opt,name=identity,proto3" json:"identity,omitempty"`
 	Role        *Role                  `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
 	Permissions []*Permission          `protobuf:"bytes,5,rep,name=permissions,proto3" json:"permissions,omitempty"`
@@ -1738,9 +1739,9 @@ func (*PluginServiceRevokeAccessRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{23}
 }
 
-func (x *PluginServiceRevokeAccessRequest) GetConfig() *PluginConfig {
+func (x *PluginServiceRevokeAccessRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -1813,7 +1814,7 @@ func (*PluginServiceRevokeAccessResponse) Descriptor() ([]byte, []int) {
 // is already a member, or to find drift.
 type PluginServiceGetAccessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Identity      *Identity              `protobuf:"bytes,2,opt,name=identity,proto3" json:"identity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1849,9 +1850,9 @@ func (*PluginServiceGetAccessRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{25}
 }
 
-func (x *PluginServiceGetAccessRequest) GetConfig() *PluginConfig {
+func (x *PluginServiceGetAccessRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -1941,7 +1942,7 @@ func (x *PluginServiceGetAccessResponse) GetIdentity() *Identity {
 // Idempotent: granting what is already granted succeeds.
 type ResourceServiceGrantAccessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Resource      *Resource              `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
 	Identity      *Identity              `protobuf:"bytes,3,opt,name=identity,proto3" json:"identity,omitempty"`
 	Role          *Role                  `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
@@ -1980,9 +1981,9 @@ func (*ResourceServiceGrantAccessRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *ResourceServiceGrantAccessRequest) GetConfig() *PluginConfig {
+func (x *ResourceServiceGrantAccessRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2093,7 +2094,7 @@ func (x *ResourceServiceGrantAccessResponse) GetPending() bool {
 // before it sends a revoke, so the role here is safe to remove in full.
 type ResourceServiceRevokeAccessRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
-	Config      *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Resource    *Resource              `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
 	Identity    *Identity              `protobuf:"bytes,3,opt,name=identity,proto3" json:"identity,omitempty"`
 	Role        *Role                  `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
@@ -2134,9 +2135,9 @@ func (*ResourceServiceRevokeAccessRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *ResourceServiceRevokeAccessRequest) GetConfig() *PluginConfig {
+func (x *ResourceServiceRevokeAccessRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2215,7 +2216,7 @@ func (*ResourceServiceRevokeAccessResponse) Descriptor() ([]byte, []int) {
 // Asks what an identity holds on a resource now.
 type ResourceServiceGetAccessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Resource      *Resource              `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
 	Identity      *Identity              `protobuf:"bytes,3,opt,name=identity,proto3" json:"identity,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2252,9 +2253,9 @@ func (*ResourceServiceGetAccessRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *ResourceServiceGetAccessRequest) GetConfig() *PluginConfig {
+func (x *ResourceServiceGetAccessRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2338,8 +2339,8 @@ func (x *ResourceServiceGetAccessResponse) GetPending() bool {
 // Idempotent: provisioning something that already exists with the same kind and name succeeds, and
 // still returns its outputs. Steward works out what changed by comparing the state it stores.
 type ResourceServiceProvisionRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Config *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Integration *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	// The kind to create, as declared in PluginDefinition.resources.
 	Kind string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
 	// What to call it in the tool. Steward stores the name with the kind.
@@ -2383,9 +2384,9 @@ func (*ResourceServiceProvisionRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{33}
 }
 
-func (x *ResourceServiceProvisionRequest) GetConfig() *PluginConfig {
+func (x *ResourceServiceProvisionRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2468,7 +2469,7 @@ func (x *ResourceServiceProvisionResponse) GetOutputs() *structpb.Struct {
 // Idempotent: removing something that is already gone succeeds.
 type ResourceServiceDeprovisionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Resource      *Resource              `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2504,9 +2505,9 @@ func (*ResourceServiceDeprovisionRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *ResourceServiceDeprovisionRequest) GetConfig() *PluginConfig {
+func (x *ResourceServiceDeprovisionRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2556,7 +2557,7 @@ func (*ResourceServiceDeprovisionResponse) Descriptor() ([]byte, []int) {
 
 type ResourceServiceListRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
 	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2593,9 +2594,9 @@ func (*ResourceServiceListRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{37}
 }
 
-func (x *ResourceServiceListRequest) GetConfig() *PluginConfig {
+func (x *ResourceServiceListRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2669,8 +2670,8 @@ func (x *ResourceServiceListResponse) GetNextPageToken() string {
 
 // Idempotent: creating an application that already exists with the same identity returns it.
 type ApplicationServiceCreateRequest struct {
-	state  protoimpl.MessageState `protogen:"open.v1"`
-	Config *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Integration *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	// A kind declared in PluginDefinition.applications, with its inputs and secrets, where it is
 	// deployed from, and its starting variables.
 	Kind          string             `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
@@ -2712,9 +2713,9 @@ func (*ApplicationServiceCreateRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{39}
 }
 
-func (x *ApplicationServiceCreateRequest) GetConfig() *PluginConfig {
+func (x *ApplicationServiceCreateRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2802,7 +2803,7 @@ func (x *ApplicationServiceCreateResponse) GetApplication() *Application {
 // Idempotent: removing an application that is already gone succeeds.
 type ApplicationServiceDestroyRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Config        *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration   *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Application   *Application           `protobuf:"bytes,2,opt,name=application,proto3" json:"application,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2838,9 +2839,9 @@ func (*ApplicationServiceDestroyRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{41}
 }
 
-func (x *ApplicationServiceDestroyRequest) GetConfig() *PluginConfig {
+func (x *ApplicationServiceDestroyRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -2894,7 +2895,7 @@ func (*ApplicationServiceDestroyResponse) Descriptor() ([]byte, []int) {
 // FAILED_PRECONDITION.
 type ApplicationServiceDeployRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
-	Config      *PluginConfig          `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	Integration *Integration           `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Application *Application           `protobuf:"bytes,2,opt,name=application,proto3" json:"application,omitempty"`
 	// What to deploy. Unset means redeploy from the application's current source.
 	Source        *ApplicationSource `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
@@ -2932,9 +2933,9 @@ func (*ApplicationServiceDeployRequest) Descriptor() ([]byte, []int) {
 	return file_steward_plugin_v1_plugin_proto_rawDescGZIP(), []int{43}
 }
 
-func (x *ApplicationServiceDeployRequest) GetConfig() *PluginConfig {
+func (x *ApplicationServiceDeployRequest) GetIntegration() *Integration {
 	if x != nil {
-		return x.Config
+		return x.Integration
 	}
 	return nil
 }
@@ -3002,10 +3003,10 @@ var File_steward_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\x1esteward/plugin/v1/plugin.proto\x12\x11steward.plugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xc3\x01\n" +
-	"\fPluginConfig\x12/\n" +
-	"\x06inputs\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12F\n" +
-	"\asecrets\x18\x02 \x03(\v2,.steward.plugin.v1.PluginConfig.SecretsEntryR\asecrets\x1a:\n" +
+	"\x1esteward/plugin/v1/plugin.proto\x12\x11steward.plugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xc1\x01\n" +
+	"\vIntegration\x12/\n" +
+	"\x06inputs\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12E\n" +
+	"\asecrets\x18\x02 \x03(\v2+.steward.plugin.v1.Integration.SecretsEntryR\asecrets\x1a:\n" +
 	"\fSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x96\x02\n" +
@@ -3116,16 +3117,16 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x0eRoleDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\"J\n" +
-	"\x0fValidateRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\"N\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\"S\n" +
+	"\x0fValidateRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\"N\n" +
 	"\x10ValidateResponse\x12:\n" +
 	"\x06errors\x18\x01 \x03(\v2\".steward.plugin.v1.ValidationErrorR\x06errors\"A\n" +
 	"\x0fValidationError\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x81\x02\n" +
-	"\x1fPluginServiceGrantAccessRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x8a\x02\n" +
+	"\x1fPluginServiceGrantAccessRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bidentity\x18\x02 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\x12+\n" +
 	"\x04role\x18\x03 \x01(\v2\x17.steward.plugin.v1.RoleR\x04role\x12?\n" +
 	"\vpermissions\x18\x04 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\"\xba\x01\n" +
@@ -3133,24 +3134,24 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x04role\x18\x02 \x01(\v2\x17.steward.plugin.v1.RoleR\x04role\x12?\n" +
 	"\vpermissions\x18\x04 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\x12\x18\n" +
-	"\apending\x18\x03 \x01(\bR\apending\"\x92\x02\n" +
-	" PluginServiceRevokeAccessRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"\apending\x18\x03 \x01(\bR\apending\"\x9b\x02\n" +
+	" PluginServiceRevokeAccessRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bidentity\x18\x02 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\x12+\n" +
 	"\x04role\x18\x03 \x01(\v2\x17.steward.plugin.v1.RoleR\x04role\x12?\n" +
 	"\vpermissions\x18\x05 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\x12\x0e\n" +
 	"\x02id\x18\x04 \x01(\tR\x02id\"#\n" +
-	"!PluginServiceRevokeAccessResponse\"\x91\x01\n" +
-	"\x1dPluginServiceGetAccessRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"!PluginServiceRevokeAccessResponse\"\x9a\x01\n" +
+	"\x1dPluginServiceGetAccessRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bidentity\x18\x02 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\"\xe3\x01\n" +
 	"\x1ePluginServiceGetAccessResponse\x12-\n" +
 	"\x05roles\x18\x01 \x03(\v2\x17.steward.plugin.v1.RoleR\x05roles\x12?\n" +
 	"\vpermissions\x18\x04 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\x12\x18\n" +
 	"\apending\x18\x02 \x01(\bR\apending\x127\n" +
-	"\bidentity\x18\x03 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\"\xbc\x02\n" +
-	"!ResourceServiceGrantAccessRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"\bidentity\x18\x03 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\"\xc5\x02\n" +
+	"!ResourceServiceGrantAccessRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bresource\x18\x02 \x01(\v2\x1b.steward.plugin.v1.ResourceR\bresource\x127\n" +
 	"\bidentity\x18\x03 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\x12+\n" +
 	"\x04role\x18\x04 \x01(\v2\x17.steward.plugin.v1.RoleR\x04role\x12?\n" +
@@ -3159,25 +3160,25 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x04role\x18\x02 \x01(\v2\x17.steward.plugin.v1.RoleR\x04role\x12?\n" +
 	"\vpermissions\x18\x04 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\x12\x18\n" +
-	"\apending\x18\x03 \x01(\bR\apending\"\xcd\x02\n" +
-	"\"ResourceServiceRevokeAccessRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"\apending\x18\x03 \x01(\bR\apending\"\xd6\x02\n" +
+	"\"ResourceServiceRevokeAccessRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bresource\x18\x02 \x01(\v2\x1b.steward.plugin.v1.ResourceR\bresource\x127\n" +
 	"\bidentity\x18\x03 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\x12+\n" +
 	"\x04role\x18\x04 \x01(\v2\x17.steward.plugin.v1.RoleR\x04role\x12?\n" +
 	"\vpermissions\x18\x06 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\x12\x0e\n" +
 	"\x02id\x18\x05 \x01(\tR\x02id\"%\n" +
-	"#ResourceServiceRevokeAccessResponse\"\xcc\x01\n" +
-	"\x1fResourceServiceGetAccessRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"#ResourceServiceRevokeAccessResponse\"\xd5\x01\n" +
+	"\x1fResourceServiceGetAccessRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bresource\x18\x02 \x01(\v2\x1b.steward.plugin.v1.ResourceR\bresource\x127\n" +
 	"\bidentity\x18\x03 \x01(\v2\x1b.steward.plugin.v1.IdentityR\bidentity\"\xac\x01\n" +
 	" ResourceServiceGetAccessResponse\x12-\n" +
 	"\x05roles\x18\x01 \x03(\v2\x17.steward.plugin.v1.RoleR\x05roles\x12?\n" +
 	"\vpermissions\x18\x03 \x03(\v2\x1d.steward.plugin.v1.PermissionR\vpermissions\x12\x18\n" +
-	"\apending\x18\x02 \x01(\bR\apending\"\xca\x02\n" +
-	"\x1fResourceServiceProvisionRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x12\x12\n" +
+	"\apending\x18\x02 \x01(\bR\apending\"\xd3\x02\n" +
+	"\x1fResourceServiceProvisionRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12/\n" +
 	"\x06inputs\x18\x04 \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12Y\n" +
@@ -3186,21 +3187,21 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"U\n" +
 	" ResourceServiceProvisionResponse\x121\n" +
-	"\aoutputs\x18\x01 \x01(\v2\x17.google.protobuf.StructR\aoutputs\"\x95\x01\n" +
-	"!ResourceServiceDeprovisionRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x127\n" +
+	"\aoutputs\x18\x01 \x01(\v2\x17.google.protobuf.StructR\aoutputs\"\x9e\x01\n" +
+	"!ResourceServiceDeprovisionRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x127\n" +
 	"\bresource\x18\x02 \x01(\v2\x1b.steward.plugin.v1.ResourceR\bresource\"$\n" +
-	"\"ResourceServiceDeprovisionResponse\"\x88\x01\n" +
-	"\x1aResourceServiceListRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x12\x12\n" +
+	"\"ResourceServiceDeprovisionResponse\"\x91\x01\n" +
+	"\x1aResourceServiceListRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\"\x80\x01\n" +
 	"\x1bResourceServiceListResponse\x129\n" +
 	"\tresources\x18\x01 \x03(\v2\x1b.steward.plugin.v1.ResourceR\tresources\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xaf\x03\n" +
-	"\x1fApplicationServiceCreateRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x12\x12\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xb8\x03\n" +
+	"\x1fApplicationServiceCreateRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12/\n" +
 	"\x06inputs\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12Y\n" +
 	"\asecrets\x18\x04 \x03(\v2?.steward.plugin.v1.ApplicationServiceCreateRequest.SecretsEntryR\asecrets\x12<\n" +
@@ -3210,13 +3211,13 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"d\n" +
 	" ApplicationServiceCreateResponse\x12@\n" +
-	"\vapplication\x18\x01 \x01(\v2\x1e.steward.plugin.v1.ApplicationR\vapplication\"\x9d\x01\n" +
-	" ApplicationServiceDestroyRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x12@\n" +
+	"\vapplication\x18\x01 \x01(\v2\x1e.steward.plugin.v1.ApplicationR\vapplication\"\xa6\x01\n" +
+	" ApplicationServiceDestroyRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x12@\n" +
 	"\vapplication\x18\x02 \x01(\v2\x1e.steward.plugin.v1.ApplicationR\vapplication\"#\n" +
-	"!ApplicationServiceDestroyResponse\"\xda\x01\n" +
-	"\x1fApplicationServiceDeployRequest\x127\n" +
-	"\x06config\x18\x01 \x01(\v2\x1f.steward.plugin.v1.PluginConfigR\x06config\x12@\n" +
+	"!ApplicationServiceDestroyResponse\"\xe3\x01\n" +
+	"\x1fApplicationServiceDeployRequest\x12@\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\x12@\n" +
 	"\vapplication\x18\x02 \x01(\v2\x1e.steward.plugin.v1.ApplicationR\vapplication\x12<\n" +
 	"\x06source\x18\x03 \x01(\v2$.steward.plugin.v1.ApplicationSourceR\x06source\"d\n" +
 	" ApplicationServiceDeployResponse\x12@\n" +
@@ -3254,7 +3255,7 @@ func file_steward_plugin_v1_plugin_proto_rawDescGZIP() []byte {
 
 var file_steward_plugin_v1_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_steward_plugin_v1_plugin_proto_goTypes = []any{
-	(*PluginConfig)(nil),                        // 0: steward.plugin.v1.PluginConfig
+	(*Integration)(nil),                         // 0: steward.plugin.v1.Integration
 	(*Resource)(nil),                            // 1: steward.plugin.v1.Resource
 	(*Application)(nil),                         // 2: steward.plugin.v1.Application
 	(*ApplicationSource)(nil),                   // 3: steward.plugin.v1.ApplicationSource
@@ -3299,7 +3300,7 @@ var file_steward_plugin_v1_plugin_proto_goTypes = []any{
 	(*ApplicationServiceDestroyResponse)(nil),   // 42: steward.plugin.v1.ApplicationServiceDestroyResponse
 	(*ApplicationServiceDeployRequest)(nil),     // 43: steward.plugin.v1.ApplicationServiceDeployRequest
 	(*ApplicationServiceDeployResponse)(nil),    // 44: steward.plugin.v1.ApplicationServiceDeployResponse
-	nil,                                         // 45: steward.plugin.v1.PluginConfig.SecretsEntry
+	nil,                                         // 45: steward.plugin.v1.Integration.SecretsEntry
 	nil,                                         // 46: steward.plugin.v1.Resource.SecretsEntry
 	nil,                                         // 47: steward.plugin.v1.Application.SecretsEntry
 	nil,                                         // 48: steward.plugin.v1.ResourceServiceProvisionRequest.SecretsEntry
@@ -3308,8 +3309,8 @@ var file_steward_plugin_v1_plugin_proto_goTypes = []any{
 	(*structpb.Value)(nil),                      // 51: google.protobuf.Value
 }
 var file_steward_plugin_v1_plugin_proto_depIdxs = []int32{
-	50, // 0: steward.plugin.v1.PluginConfig.inputs:type_name -> google.protobuf.Struct
-	45, // 1: steward.plugin.v1.PluginConfig.secrets:type_name -> steward.plugin.v1.PluginConfig.SecretsEntry
+	50, // 0: steward.plugin.v1.Integration.inputs:type_name -> google.protobuf.Struct
+	45, // 1: steward.plugin.v1.Integration.secrets:type_name -> steward.plugin.v1.Integration.SecretsEntry
 	50, // 2: steward.plugin.v1.Resource.inputs:type_name -> google.protobuf.Struct
 	46, // 3: steward.plugin.v1.Resource.secrets:type_name -> steward.plugin.v1.Resource.SecretsEntry
 	50, // 4: steward.plugin.v1.Resource.outputs:type_name -> google.protobuf.Struct
@@ -3336,57 +3337,57 @@ var file_steward_plugin_v1_plugin_proto_depIdxs = []int32{
 	11, // 25: steward.plugin.v1.ApplicationDefinition.inputs:type_name -> steward.plugin.v1.InputDefinition
 	12, // 26: steward.plugin.v1.ApplicationDefinition.secrets:type_name -> steward.plugin.v1.SecretDefinition
 	13, // 27: steward.plugin.v1.ApplicationDefinition.outputs:type_name -> steward.plugin.v1.OutputDefinition
-	0,  // 28: steward.plugin.v1.ValidateRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 28: steward.plugin.v1.ValidateRequest.integration:type_name -> steward.plugin.v1.Integration
 	20, // 29: steward.plugin.v1.ValidateResponse.errors:type_name -> steward.plugin.v1.ValidationError
-	0,  // 30: steward.plugin.v1.PluginServiceGrantAccessRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 30: steward.plugin.v1.PluginServiceGrantAccessRequest.integration:type_name -> steward.plugin.v1.Integration
 	5,  // 31: steward.plugin.v1.PluginServiceGrantAccessRequest.identity:type_name -> steward.plugin.v1.Identity
 	6,  // 32: steward.plugin.v1.PluginServiceGrantAccessRequest.role:type_name -> steward.plugin.v1.Role
 	7,  // 33: steward.plugin.v1.PluginServiceGrantAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
 	6,  // 34: steward.plugin.v1.PluginServiceGrantAccessResponse.role:type_name -> steward.plugin.v1.Role
 	7,  // 35: steward.plugin.v1.PluginServiceGrantAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 36: steward.plugin.v1.PluginServiceRevokeAccessRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 36: steward.plugin.v1.PluginServiceRevokeAccessRequest.integration:type_name -> steward.plugin.v1.Integration
 	5,  // 37: steward.plugin.v1.PluginServiceRevokeAccessRequest.identity:type_name -> steward.plugin.v1.Identity
 	6,  // 38: steward.plugin.v1.PluginServiceRevokeAccessRequest.role:type_name -> steward.plugin.v1.Role
 	7,  // 39: steward.plugin.v1.PluginServiceRevokeAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 40: steward.plugin.v1.PluginServiceGetAccessRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 40: steward.plugin.v1.PluginServiceGetAccessRequest.integration:type_name -> steward.plugin.v1.Integration
 	5,  // 41: steward.plugin.v1.PluginServiceGetAccessRequest.identity:type_name -> steward.plugin.v1.Identity
 	6,  // 42: steward.plugin.v1.PluginServiceGetAccessResponse.roles:type_name -> steward.plugin.v1.Role
 	7,  // 43: steward.plugin.v1.PluginServiceGetAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
 	5,  // 44: steward.plugin.v1.PluginServiceGetAccessResponse.identity:type_name -> steward.plugin.v1.Identity
-	0,  // 45: steward.plugin.v1.ResourceServiceGrantAccessRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 45: steward.plugin.v1.ResourceServiceGrantAccessRequest.integration:type_name -> steward.plugin.v1.Integration
 	1,  // 46: steward.plugin.v1.ResourceServiceGrantAccessRequest.resource:type_name -> steward.plugin.v1.Resource
 	5,  // 47: steward.plugin.v1.ResourceServiceGrantAccessRequest.identity:type_name -> steward.plugin.v1.Identity
 	6,  // 48: steward.plugin.v1.ResourceServiceGrantAccessRequest.role:type_name -> steward.plugin.v1.Role
 	7,  // 49: steward.plugin.v1.ResourceServiceGrantAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
 	6,  // 50: steward.plugin.v1.ResourceServiceGrantAccessResponse.role:type_name -> steward.plugin.v1.Role
 	7,  // 51: steward.plugin.v1.ResourceServiceGrantAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 52: steward.plugin.v1.ResourceServiceRevokeAccessRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 52: steward.plugin.v1.ResourceServiceRevokeAccessRequest.integration:type_name -> steward.plugin.v1.Integration
 	1,  // 53: steward.plugin.v1.ResourceServiceRevokeAccessRequest.resource:type_name -> steward.plugin.v1.Resource
 	5,  // 54: steward.plugin.v1.ResourceServiceRevokeAccessRequest.identity:type_name -> steward.plugin.v1.Identity
 	6,  // 55: steward.plugin.v1.ResourceServiceRevokeAccessRequest.role:type_name -> steward.plugin.v1.Role
 	7,  // 56: steward.plugin.v1.ResourceServiceRevokeAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 57: steward.plugin.v1.ResourceServiceGetAccessRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 57: steward.plugin.v1.ResourceServiceGetAccessRequest.integration:type_name -> steward.plugin.v1.Integration
 	1,  // 58: steward.plugin.v1.ResourceServiceGetAccessRequest.resource:type_name -> steward.plugin.v1.Resource
 	5,  // 59: steward.plugin.v1.ResourceServiceGetAccessRequest.identity:type_name -> steward.plugin.v1.Identity
 	6,  // 60: steward.plugin.v1.ResourceServiceGetAccessResponse.roles:type_name -> steward.plugin.v1.Role
 	7,  // 61: steward.plugin.v1.ResourceServiceGetAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 62: steward.plugin.v1.ResourceServiceProvisionRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 62: steward.plugin.v1.ResourceServiceProvisionRequest.integration:type_name -> steward.plugin.v1.Integration
 	50, // 63: steward.plugin.v1.ResourceServiceProvisionRequest.inputs:type_name -> google.protobuf.Struct
 	48, // 64: steward.plugin.v1.ResourceServiceProvisionRequest.secrets:type_name -> steward.plugin.v1.ResourceServiceProvisionRequest.SecretsEntry
 	50, // 65: steward.plugin.v1.ResourceServiceProvisionResponse.outputs:type_name -> google.protobuf.Struct
-	0,  // 66: steward.plugin.v1.ResourceServiceDeprovisionRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 66: steward.plugin.v1.ResourceServiceDeprovisionRequest.integration:type_name -> steward.plugin.v1.Integration
 	1,  // 67: steward.plugin.v1.ResourceServiceDeprovisionRequest.resource:type_name -> steward.plugin.v1.Resource
-	0,  // 68: steward.plugin.v1.ResourceServiceListRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 68: steward.plugin.v1.ResourceServiceListRequest.integration:type_name -> steward.plugin.v1.Integration
 	1,  // 69: steward.plugin.v1.ResourceServiceListResponse.resources:type_name -> steward.plugin.v1.Resource
-	0,  // 70: steward.plugin.v1.ApplicationServiceCreateRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 70: steward.plugin.v1.ApplicationServiceCreateRequest.integration:type_name -> steward.plugin.v1.Integration
 	50, // 71: steward.plugin.v1.ApplicationServiceCreateRequest.inputs:type_name -> google.protobuf.Struct
 	49, // 72: steward.plugin.v1.ApplicationServiceCreateRequest.secrets:type_name -> steward.plugin.v1.ApplicationServiceCreateRequest.SecretsEntry
 	3,  // 73: steward.plugin.v1.ApplicationServiceCreateRequest.source:type_name -> steward.plugin.v1.ApplicationSource
 	4,  // 74: steward.plugin.v1.ApplicationServiceCreateRequest.variables:type_name -> steward.plugin.v1.Variable
 	2,  // 75: steward.plugin.v1.ApplicationServiceCreateResponse.application:type_name -> steward.plugin.v1.Application
-	0,  // 76: steward.plugin.v1.ApplicationServiceDestroyRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 76: steward.plugin.v1.ApplicationServiceDestroyRequest.integration:type_name -> steward.plugin.v1.Integration
 	2,  // 77: steward.plugin.v1.ApplicationServiceDestroyRequest.application:type_name -> steward.plugin.v1.Application
-	0,  // 78: steward.plugin.v1.ApplicationServiceDeployRequest.config:type_name -> steward.plugin.v1.PluginConfig
+	0,  // 78: steward.plugin.v1.ApplicationServiceDeployRequest.integration:type_name -> steward.plugin.v1.Integration
 	2,  // 79: steward.plugin.v1.ApplicationServiceDeployRequest.application:type_name -> steward.plugin.v1.Application
 	3,  // 80: steward.plugin.v1.ApplicationServiceDeployRequest.source:type_name -> steward.plugin.v1.ApplicationSource
 	2,  // 81: steward.plugin.v1.ApplicationServiceDeployResponse.application:type_name -> steward.plugin.v1.Application

@@ -36,7 +36,7 @@ const (
 type PluginServiceClient interface {
 	// Describes the plugin: what it needs (its inputs) and the resources it manages.
 	Describe(ctx context.Context, in *DescribeRequest, opts ...grpc.CallOption) (*DescribeResponse, error)
-	// Checks a config, for example that the inputs are valid and the credentials work.
+	// Checks an integration, for example that the inputs are valid and the credentials work.
 	Validate(ctx context.Context, in *ValidateRequest, opts ...grpc.CallOption) (*ValidateResponse, error)
 	// Access to the plugin as a whole: giving identities roles on it, taking them away, and checking
 	// what they hold.
@@ -113,7 +113,7 @@ func (c *pluginServiceClient) GetAccess(ctx context.Context, in *PluginServiceGe
 type PluginServiceServer interface {
 	// Describes the plugin: what it needs (its inputs) and the resources it manages.
 	Describe(context.Context, *DescribeRequest) (*DescribeResponse, error)
-	// Checks a config, for example that the inputs are valid and the credentials work.
+	// Checks an integration, for example that the inputs are valid and the credentials work.
 	Validate(context.Context, *ValidateRequest) (*ValidateResponse, error)
 	// Access to the plugin as a whole: giving identities roles on it, taking them away, and checking
 	// what they hold.

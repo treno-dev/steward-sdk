@@ -32,21 +32,21 @@ from steward_sdk.plugin import (
 async def validate(request: PluginValidateRequest) -> PluginValidateResponse:
     errors = []
 
-    if not request.config.secrets.get("API_TOKEN"):
+    if not request.integration.secrets.get("API_TOKEN"):
         errors.append({"field": "API_TOKEN", "message": "An API token is required."})
 
     return {"errors": errors}
 
 
 # Create a resource called `request.name`. Idempotent: if it already exists, succeed anyway. Return
-# what it produced, as declared in `outputs`. The request also has `config` and `inputs`.
+# what it produced, as declared in `outputs`. The request also has `integration` and `inputs`.
 async def provision(request: ResourceProvisionRequest) -> ResourceProvisionResponse:
-    base_url = request.config.inputs["base_url"]
+    base_url = request.integration.inputs["base_url"]
 
     return {"outputs": {"url": f"{base_url}/items/{request.name}"}}
 
 
-# Remove a resource. Idempotent: succeed if it is already gone. The request has `config` and
+# Remove a resource. Idempotent: succeed if it is already gone. The request has `integration` and
 # `resource` (`kind`, `name`).
 async def deprovision(request: ResourceDeprovisionRequest) -> ResourceDeprovisionResponse:
     return {}
@@ -55,7 +55,7 @@ async def deprovision(request: ResourceDeprovisionRequest) -> ResourceDeprovisio
 # Give an identity a role on the resource. Idempotent. `role` is always set. For a role Steward
 # composed, `permissions` lists its pieces. Return what the tool applied, an `id` for the grant if
 # the tool has one, and `pending: True` if the person has to act first, such as accepting an
-# invitation. The request has `config`, `resource`, `identity` (`external_id`, `name`, `attrs`),
+# invitation. The request has `integration`, `resource`, `identity` (`external_id`, `name`, `attrs`),
 # `role` and `permissions`.
 async def grant_access(request: ResourceGrantAccessRequest) -> ResourceGrantAccessResponse:
     return {"role": plain(request.role), "permissions": [plain(item) for item in request.permissions]}
@@ -73,8 +73,8 @@ async def get_access(request: ResourceGetAccessRequest) -> ResourceGetAccessResp
 
 
 # Steward builds the plugin's form from `inputs` and `secrets`, so they are also the documentation
-# people see. Settings arrive in `request.config.inputs`, and credentials, kept and sent separately,
-# in `request.config.secrets`.
+# people see. Settings arrive in `request.integration.inputs`, and credentials, kept and sent separately,
+# in `request.integration.secrets`.
 plugin = create_plugin(
     name="[[.Name]]",
     version="0.1.0",

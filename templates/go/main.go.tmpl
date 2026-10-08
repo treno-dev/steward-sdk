@@ -22,7 +22,7 @@ import (
 func validate(ctx context.Context, request *plugin.PluginValidateRequest) (*plugin.PluginValidateResponse, error) {
 	response := &plugin.PluginValidateResponse{}
 
-	if request.GetConfig().GetSecrets()["API_TOKEN"] == "" {
+	if request.GetIntegration().GetSecrets()["API_TOKEN"] == "" {
 		response.Errors = append(response.Errors, &plugin.ValidationError{
 			Field:   "API_TOKEN",
 			Message: "An API token is required.",
@@ -33,16 +33,16 @@ func validate(ctx context.Context, request *plugin.PluginValidateRequest) (*plug
 }
 
 // Create a resource called request.Name. Idempotent: if it already exists, succeed anyway. Return
-// what it produced, as declared in Outputs. The request also has the Config and the Inputs.
+// what it produced, as declared in Outputs. The request also has the Integration and the Inputs.
 func provision(ctx context.Context, request *plugin.ResourceProvisionRequest) (*plugin.ResourceProvisionResponse, error) {
-	baseURL := request.GetConfig().GetInputs().AsMap()["base_url"]
+	baseURL := request.GetIntegration().GetInputs().AsMap()["base_url"]
 
 	return &plugin.ResourceProvisionResponse{
 		Outputs: plugin.Struct(map[string]any{"url": fmt.Sprintf("%v/items/%s", baseURL, request.GetName())}),
 	}, nil
 }
 
-// Remove a resource. Idempotent: succeed if it is already gone. The request has the Config and the
+// Remove a resource. Idempotent: succeed if it is already gone. The request has the Integration and the
 // Resource (Kind, Name).
 func deprovision(ctx context.Context, request *plugin.ResourceDeprovisionRequest) (*plugin.ResourceDeprovisionResponse, error) {
 	return &plugin.ResourceDeprovisionResponse{}, nil
@@ -51,7 +51,7 @@ func deprovision(ctx context.Context, request *plugin.ResourceDeprovisionRequest
 // Give an identity a role on the resource. Idempotent. The Role is always set. For a role Steward
 // composed, Permissions lists its pieces. Return what the tool applied, an Id for the grant if the
 // tool has one, and Pending if the person has to act first, such as accepting an invitation. The
-// request has the Config, Resource, Identity (ExternalId, Name, Attrs), Role and Permissions.
+// request has the Integration, Resource, Identity (ExternalId, Name, Attrs), Role and Permissions.
 func grantAccess(ctx context.Context, request *plugin.ResourceGrantAccessRequest) (*plugin.ResourceGrantAccessResponse, error) {
 	return &plugin.ResourceGrantAccessResponse{Role: request.GetRole(), Permissions: request.GetPermissions()}, nil
 }
@@ -69,8 +69,8 @@ func getAccess(ctx context.Context, request *plugin.ResourceGetAccessRequest) (*
 
 func main() {
 	// Steward builds the plugin's form from Inputs and Secrets, so they are also the documentation
-	// people see. Settings arrive in request.Config.Inputs, and credentials, kept and sent
-	// separately, in request.Config.Secrets.
+	// people see. Settings arrive in request.Integration.Inputs, and credentials, kept and sent
+	// separately, in request.Integration.Secrets.
 	p := plugin.New(plugin.Options{
 		Name:        "[[.Name]]",
 		Version:     "0.1.0",

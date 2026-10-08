@@ -265,11 +265,11 @@ function toStatus(error: unknown): grpc.ServiceError {
   return { code: grpc.status.INTERNAL, message } as grpc.ServiceError;
 }
 
-// Makes the message fields a handler relies on present, so it can read `config.inputs.x` without
+// Makes the message fields a handler relies on present, so it can read `integration.inputs.x` without
 // checking. An absent message becomes the generated type's default, and an absent Struct becomes an
 // empty object.
 const MESSAGES: Record<string, MessageType> = {
-  config: contract.PluginConfig,
+  integration: contract.Integration,
   resource: contract.Resource,
   application: contract.Application,
   identity: contract.Identity,
@@ -400,7 +400,7 @@ function serve(plugin: Plugin): void {
 
   server.addService(contract.PluginServiceService, implement(contract.PluginServiceService, {
     describe: () => plugin.describe(),
-    // Every plugin must answer Validate; without a handler of its own, every config is accepted.
+    // Every plugin must answer Validate; without a handler of its own, every integration is accepted.
     validate: plugin.options.validate ? plugin.route('validate', 'plugin') : () => ({}),
     ...routes(plugin, ACCESS_CALLS, 'plugin'),
   }));

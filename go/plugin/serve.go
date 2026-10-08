@@ -90,7 +90,7 @@ func (s pluginService) Describe(context.Context, *pluginv1.DescribeRequest) (*pl
 }
 
 func (s pluginService) Validate(ctx context.Context, request *PluginValidateRequest) (*PluginValidateResponse, error) {
-	// Every plugin must answer Validate; without a handler of its own, every config is accepted.
+	// Every plugin must answer Validate; without a handler of its own, every integration is accepted.
 	if s.plugin.options.Validate == nil {
 		return &PluginValidateResponse{}, nil
 	}

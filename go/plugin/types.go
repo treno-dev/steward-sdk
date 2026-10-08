@@ -35,7 +35,7 @@ func Value(value any) *structpb.Value {
 // The messages a plugin works with, from the generated contract, so a plugin imports one package.
 // Requests and responses are named for what they handle (the entity, then the call).
 type (
-	PluginConfig      = pluginv1.PluginConfig
+	Integration       = pluginv1.Integration
 	Resource          = pluginv1.Resource
 	Application       = pluginv1.Application
 	ApplicationSource = pluginv1.ApplicationSource

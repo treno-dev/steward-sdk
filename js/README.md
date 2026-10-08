@@ -51,8 +51,8 @@ plugin.resource({
   kind: 'item',
   outputs: [{ name: 'url', label: 'URL', type: 'string' }],
 
-  async provision({ config, name }) {
-    return { outputs: { url: `${config.inputs.base_url}/items/${name}` } };
+  async provision({ integration, name }) {
+    return { outputs: { url: `${integration.inputs.base_url}/items/${name}` } };
   },
 
   async deprovision({ resource }) {
@@ -77,7 +77,7 @@ for example both Cloudflare and AWS, take the credentials for each as secrets.
 | `title`, `description` | Shown in Steward. |
 | `inputs` | The settings the plugin is configured with. |
 | `secrets` | The credentials it is configured with, such as an API token. |
-| `validate` | Optional. Checks the credentials, which Steward cannot. Returns `{ errors: [{ field, message }] }`. Without it, every config is accepted. |
+| `validate` | Optional. Checks the credentials, which Steward cannot. Returns `{ errors: [{ field, message }] }`. Without it, every integration is accepted. |
 | `roles`, `permissions`, `grantAccess`, `revokeAccess`, `getAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
 **A resource**, with `plugin.resource({ kind, ... })`, and **an application**, with
@@ -124,18 +124,18 @@ const plugin = createPlugin({
 
   roles: [{ name: 'member', title: 'Member' }, { name: 'owner', title: 'Owner' }],
 
-  grantAccess: async ({ config, identity, role }) => {
-    const invitation = await invite(config, identity.externalId || identity.attrs.email, role.name);
+  grantAccess: async ({ integration, identity, role }) => {
+    const invitation = await invite(integration, identity.externalId || identity.attrs.email, role.name);
 
     return { id: invitation.id, role, pending: true }; // an invitation is not access until accepted
   },
-  revokeAccess: async ({ config, identity }) => {
-    await removeFromOrganization(config, identity.externalId);
+  revokeAccess: async ({ integration, identity }) => {
+    await removeFromOrganization(integration, identity.externalId);
 
     return {};
   },
-  getAccess: async ({ config, identity }) => {
-    const membership = await findMembership(config, identity);
+  getAccess: async ({ integration, identity }) => {
+    const membership = await findMembership(integration, identity);
 
     return { roles: membership ? [{ name: membership.role }] : [], pending: Boolean(membership?.pending) };
   },
@@ -154,18 +154,18 @@ plugin.resource({
   permissions: [{ name: 'pull' }, { name: 'push' }],
   roles: [{ name: 'viewer', title: 'Viewer' }, { name: 'editor', title: 'Editor' }],
 
-  grantAccess: async ({ config, resource, identity, role, permissions }) => {
-    await addCollaborator(config, resource.name, identity.externalId, role.name);
+  grantAccess: async ({ integration, resource, identity, role, permissions }) => {
+    await addCollaborator(integration, resource.name, identity.externalId, role.name);
 
     return { role, permissions };
   },
-  revokeAccess: async ({ config, resource, identity }) => {
-    await removeCollaborator(config, resource.name, identity.externalId);
+  revokeAccess: async ({ integration, resource, identity }) => {
+    await removeCollaborator(integration, resource.name, identity.externalId);
 
     return {};
   },
-  getAccess: async ({ config, resource, identity }) => {
-    const collaborator = await findCollaborator(config, resource.name, identity);
+  getAccess: async ({ integration, resource, identity }) => {
+    const collaborator = await findCollaborator(integration, resource.name, identity);
 
     return { roles: collaborator ? [{ name: collaborator.role }] : [] };
   },
@@ -213,8 +213,8 @@ A handler receives the request as a plain object and returns the response as one
 any field it has nothing to say about. Field names are camelCase. In TypeScript, requests and
 responses are typed from the contract.
 
-- **Inputs and secrets.** `config.inputs` and `inputs` hold the values of the inputs, keyed by input
-  name. The values of secrets arrive apart from them, keyed by secret name, in `config.secrets` (and a
+- **Inputs and secrets.** `integration.inputs` and `inputs` hold the values of the inputs, keyed by input
+  name. The values of secrets arrive apart from them, keyed by secret name, in `integration.secrets` (and a
   resource's or application's `secrets`). Never store them. The SDK always provides these objects,
   empty if nothing was set.
 - **Idempotent, and no report of changes.** Make calls that change something idempotent: creating

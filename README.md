@@ -146,7 +146,7 @@ road, and a plugin in Rust, Java or anything else is the same contract without t
 
 ### The pieces of a plugin
 
-- **A config**: what the plugin is set up with. It declares its **inputs**, like variables with a name
+- **An integration**: an instance of the plugin, with the inputs and secrets it is set up with. The plugin declares its **inputs**, like variables with a name
   and a type, and its **secrets**, the credentials it needs, with a name and a description. The runner
   passes secrets to each call separately from the inputs so the plugin never has to store them.
 - **Resources**: the things the tool holds, each declared once under a **kind** (`"repository"`) with
@@ -194,10 +194,10 @@ const plugin = createPlugin({
   ],
 
   // Return an error for each input or secret the user can fix.
-  async validate({ config }) {
+  async validate({ integration }) {
     const errors = [];
 
-    if (!config.secrets.API_TOKEN) {
+    if (!integration.secrets.API_TOKEN) {
       errors.push({ field: "API_TOKEN", message: "An API token is required." });
     }
 
@@ -207,15 +207,15 @@ const plugin = createPlugin({
   // Access to the tool as a whole, such as membership of an organization.
   roles: [{ name: "member", title: "Member" }],
 
-  async grantAccess({ config, identity, role }) {
+  async grantAccess({ integration, identity, role }) {
     return { role };
   },
 
-  async revokeAccess({ config, identity }) {
+  async revokeAccess({ integration, identity }) {
     return {};
   },
 
-  async getAccess({ config, identity }) {
+  async getAccess({ integration, identity }) {
     return { roles: [] };
   },
 });
@@ -235,8 +235,8 @@ plugin.resource({
   ],
 
   // Create the resource. Idempotent. Return what it produced.
-  async provision({ config, name }) {
-    return { outputs: { url: `${config.inputs.base_url}/items/${name}` } };
+  async provision({ integration, name }) {
+    return { outputs: { url: `${integration.inputs.base_url}/items/${name}` } };
   },
 
   async deprovision({ resource }) {
@@ -245,7 +245,7 @@ plugin.resource({
 
   // Access to one resource: give an identity a role on it. The role is always set, and `permissions`
   // lists the pieces of a role Steward composed. Return what the tool applied.
-  async grantAccess({ config, resource, identity, role, permissions }) {
+  async grantAccess({ integration, resource, identity, role, permissions }) {
     return { role, permissions };
   },
 
@@ -277,7 +277,7 @@ The other languages follow the same shape, in their own idiom:
 
 | Language               | Install                                      | Declare                                                 | A handler                                        |
 | ---------------------- | -------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------ |
-| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk`         | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ config, name }) { ... }`      |
+| JavaScript, TypeScript | `npm install @treno-dev/steward-sdk`         | `createPlugin({...})`, `plugin.resource({ kind, ... })` | `async provision({ integration, name }) { ... }`      |
 | Python                 | `pip install treno-dev-steward-sdk`          | `create_plugin(...)`, `plugin.resource(kind=..., ...)`  | `async def provision(request): ...`              |
 | Go                     | `go get github.com/treno-dev/steward-sdk/go` | `plugin.New(...)`, `p.Resource("kind", ...)`            | `func(ctx, *Request) (*Response, error)`         |
 
@@ -393,7 +393,7 @@ printed as they come, so outputs marked sensitive show in your terminal as well.
 
 ```json
 {
-  "config": {
+  "integration": {
     "inputs": { "base_url": "https://example.test" },
     "secrets": { "API_TOKEN": "..." }
   },
@@ -406,7 +406,7 @@ printed as they come, so outputs marked sensitive show in your terminal as well.
 }
 ```
 
-- **`config`** holds the values the plugin is invoked with, as Steward would supply them: its inputs and
+- **`integration`** holds the values the plugin is invoked with, as Steward would supply them: its inputs and
   its secrets.
 - **`resources`** is a list of the requests that create resources. Each has a `kind` the plugin declares, a
   `name`, and the `inputs` and `secrets` of that kind. They run in the order listed, and you can list
@@ -414,7 +414,7 @@ printed as they come, so outputs marked sensitive show in your terminal as well.
 - **`identity`** and **`role`** are who is given which role, on the plugin and on each resource. The role
   is always named. Its `permissions` are only for a role Steward composed from the plugin's permissions.
 
-`run` needs the file. `validate` can take it too, with `--context`, to give the plugin the config the read-only
+`run` needs the file. `validate` can take it too, with `--context`, to give the plugin the integration the read-only
 calls are made with. Both commands exit with a failure when a check fails, so they can run in CI, and
 `--verbose` shows what the plugin writes to standard error.
 

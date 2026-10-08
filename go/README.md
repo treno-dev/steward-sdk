@@ -56,7 +56,7 @@ p.Serve()
 | `Title`, `Description` | Shown in Steward. |
 | `Inputs` | The settings the plugin is configured with. |
 | `Secrets` | The credentials it is configured with, such as an API token. |
-| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every config is accepted. |
+| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every integration is accepted. |
 | `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
 **A resource**, with `p.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,
@@ -162,11 +162,11 @@ A handler is `func(context.Context, *Request) (*Response, error)`, with the requ
 for the entity and the call: `ResourceProvisionRequest`, `ResourceProvisionResponse`. They are the
 generated contract messages, re-exported by the package so a plugin imports one thing.
 
-- **Getters are nil-safe.** Use `request.GetConfig().GetSecrets()["API_TOKEN"]`: anything the runner
+- **Getters are nil-safe.** Use `request.GetIntegration().GetSecrets()["API_TOKEN"]`: anything the runner
   did not send reads as empty.
-- **Inputs and secrets.** `Config.Inputs` and `Inputs` hold the values of the inputs; call `.AsMap()`
+- **Inputs and secrets.** `Integration.Inputs` and `Inputs` hold the values of the inputs; call `.AsMap()`
   on one for a plain `map[string]any` (numbers arrive as `float64`). The values of secrets arrive apart
-  from them, keyed by secret name, in `Config.Secrets` (and a resource's or application's `Secrets`)
+  from them, keyed by secret name, in `Integration.Secrets` (and a resource's or application's `Secrets`)
   as a `map[string]string`. Never store them.
 - **Open-ended values in a response**, such as `Outputs`, are built with `plugin.Struct(map[string]any{...})`,
   and an input's `Default` with `plugin.Value(...)`. They take what JSON can hold; anything else
