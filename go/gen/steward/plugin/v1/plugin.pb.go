@@ -1450,9 +1450,14 @@ func (x *ValidateRequest) GetIntegration() *Integration {
 
 type ValidateResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Problems with the inputs or credentials that the user can fix. Empty when the integration is good.
-	// Failures of the call itself are returned as gRPC errors instead.
-	Errors        []*ValidationError `protobuf:"bytes,1,rep,name=errors,proto3" json:"errors,omitempty"`
+	// Problems with the integration as a whole, which the user can fix but which are not about one input or secret. Empty when
+	// the integration is good. Failures of the call itself are returned as gRPC errors instead.
+	Errors []*ValidationError `protobuf:"bytes,1,rep,name=errors,proto3" json:"errors,omitempty"`
+	// Problems with one input, each naming the input in `field`. Inputs and secrets are separate lists, so which list an error is in
+	// says which of them it is about.
+	InputErrors []*ValidationError `protobuf:"bytes,2,rep,name=input_errors,json=inputErrors,proto3" json:"input_errors,omitempty"`
+	// Problems with one secret, each naming the secret in `field`, such as a token that the tool does not accept.
+	SecretErrors  []*ValidationError `protobuf:"bytes,3,rep,name=secret_errors,json=secretErrors,proto3" json:"secret_errors,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1494,9 +1499,24 @@ func (x *ValidateResponse) GetErrors() []*ValidationError {
 	return nil
 }
 
+func (x *ValidateResponse) GetInputErrors() []*ValidationError {
+	if x != nil {
+		return x.InputErrors
+	}
+	return nil
+}
+
+func (x *ValidateResponse) GetSecretErrors() []*ValidationError {
+	if x != nil {
+		return x.SecretErrors
+	}
+	return nil
+}
+
 type ValidationError struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The input the error is about. Empty when it is about the integration as a whole.
+	// The name of the input or the secret the error is about, as the list it is in says. Empty in `errors`, which is about the
+	// integration as a whole.
 	Field         string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
 	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -3119,9 +3139,11 @@ const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\"S\n" +
 	"\x0fValidateRequest\x12@\n" +
-	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\"N\n" +
+	"\vintegration\x18\x01 \x01(\v2\x1e.steward.plugin.v1.IntegrationR\vintegration\"\xde\x01\n" +
 	"\x10ValidateResponse\x12:\n" +
-	"\x06errors\x18\x01 \x03(\v2\".steward.plugin.v1.ValidationErrorR\x06errors\"A\n" +
+	"\x06errors\x18\x01 \x03(\v2\".steward.plugin.v1.ValidationErrorR\x06errors\x12E\n" +
+	"\finput_errors\x18\x02 \x03(\v2\".steward.plugin.v1.ValidationErrorR\vinputErrors\x12G\n" +
+	"\rsecret_errors\x18\x03 \x03(\v2\".steward.plugin.v1.ValidationErrorR\fsecretErrors\"A\n" +
 	"\x0fValidationError\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\x8a\x02\n" +
@@ -3339,91 +3361,93 @@ var file_steward_plugin_v1_plugin_proto_depIdxs = []int32{
 	13, // 27: steward.plugin.v1.ApplicationDefinition.outputs:type_name -> steward.plugin.v1.OutputDefinition
 	0,  // 28: steward.plugin.v1.ValidateRequest.integration:type_name -> steward.plugin.v1.Integration
 	20, // 29: steward.plugin.v1.ValidateResponse.errors:type_name -> steward.plugin.v1.ValidationError
-	0,  // 30: steward.plugin.v1.PluginServiceGrantAccessRequest.integration:type_name -> steward.plugin.v1.Integration
-	5,  // 31: steward.plugin.v1.PluginServiceGrantAccessRequest.identity:type_name -> steward.plugin.v1.Identity
-	6,  // 32: steward.plugin.v1.PluginServiceGrantAccessRequest.role:type_name -> steward.plugin.v1.Role
-	7,  // 33: steward.plugin.v1.PluginServiceGrantAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
-	6,  // 34: steward.plugin.v1.PluginServiceGrantAccessResponse.role:type_name -> steward.plugin.v1.Role
-	7,  // 35: steward.plugin.v1.PluginServiceGrantAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 36: steward.plugin.v1.PluginServiceRevokeAccessRequest.integration:type_name -> steward.plugin.v1.Integration
-	5,  // 37: steward.plugin.v1.PluginServiceRevokeAccessRequest.identity:type_name -> steward.plugin.v1.Identity
-	6,  // 38: steward.plugin.v1.PluginServiceRevokeAccessRequest.role:type_name -> steward.plugin.v1.Role
-	7,  // 39: steward.plugin.v1.PluginServiceRevokeAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 40: steward.plugin.v1.PluginServiceGetAccessRequest.integration:type_name -> steward.plugin.v1.Integration
-	5,  // 41: steward.plugin.v1.PluginServiceGetAccessRequest.identity:type_name -> steward.plugin.v1.Identity
-	6,  // 42: steward.plugin.v1.PluginServiceGetAccessResponse.roles:type_name -> steward.plugin.v1.Role
-	7,  // 43: steward.plugin.v1.PluginServiceGetAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	5,  // 44: steward.plugin.v1.PluginServiceGetAccessResponse.identity:type_name -> steward.plugin.v1.Identity
-	0,  // 45: steward.plugin.v1.ResourceServiceGrantAccessRequest.integration:type_name -> steward.plugin.v1.Integration
-	1,  // 46: steward.plugin.v1.ResourceServiceGrantAccessRequest.resource:type_name -> steward.plugin.v1.Resource
-	5,  // 47: steward.plugin.v1.ResourceServiceGrantAccessRequest.identity:type_name -> steward.plugin.v1.Identity
-	6,  // 48: steward.plugin.v1.ResourceServiceGrantAccessRequest.role:type_name -> steward.plugin.v1.Role
-	7,  // 49: steward.plugin.v1.ResourceServiceGrantAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
-	6,  // 50: steward.plugin.v1.ResourceServiceGrantAccessResponse.role:type_name -> steward.plugin.v1.Role
-	7,  // 51: steward.plugin.v1.ResourceServiceGrantAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 52: steward.plugin.v1.ResourceServiceRevokeAccessRequest.integration:type_name -> steward.plugin.v1.Integration
-	1,  // 53: steward.plugin.v1.ResourceServiceRevokeAccessRequest.resource:type_name -> steward.plugin.v1.Resource
-	5,  // 54: steward.plugin.v1.ResourceServiceRevokeAccessRequest.identity:type_name -> steward.plugin.v1.Identity
-	6,  // 55: steward.plugin.v1.ResourceServiceRevokeAccessRequest.role:type_name -> steward.plugin.v1.Role
-	7,  // 56: steward.plugin.v1.ResourceServiceRevokeAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 57: steward.plugin.v1.ResourceServiceGetAccessRequest.integration:type_name -> steward.plugin.v1.Integration
-	1,  // 58: steward.plugin.v1.ResourceServiceGetAccessRequest.resource:type_name -> steward.plugin.v1.Resource
-	5,  // 59: steward.plugin.v1.ResourceServiceGetAccessRequest.identity:type_name -> steward.plugin.v1.Identity
-	6,  // 60: steward.plugin.v1.ResourceServiceGetAccessResponse.roles:type_name -> steward.plugin.v1.Role
-	7,  // 61: steward.plugin.v1.ResourceServiceGetAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
-	0,  // 62: steward.plugin.v1.ResourceServiceProvisionRequest.integration:type_name -> steward.plugin.v1.Integration
-	50, // 63: steward.plugin.v1.ResourceServiceProvisionRequest.inputs:type_name -> google.protobuf.Struct
-	48, // 64: steward.plugin.v1.ResourceServiceProvisionRequest.secrets:type_name -> steward.plugin.v1.ResourceServiceProvisionRequest.SecretsEntry
-	50, // 65: steward.plugin.v1.ResourceServiceProvisionResponse.outputs:type_name -> google.protobuf.Struct
-	0,  // 66: steward.plugin.v1.ResourceServiceDeprovisionRequest.integration:type_name -> steward.plugin.v1.Integration
-	1,  // 67: steward.plugin.v1.ResourceServiceDeprovisionRequest.resource:type_name -> steward.plugin.v1.Resource
-	0,  // 68: steward.plugin.v1.ResourceServiceListRequest.integration:type_name -> steward.plugin.v1.Integration
-	1,  // 69: steward.plugin.v1.ResourceServiceListResponse.resources:type_name -> steward.plugin.v1.Resource
-	0,  // 70: steward.plugin.v1.ApplicationServiceCreateRequest.integration:type_name -> steward.plugin.v1.Integration
-	50, // 71: steward.plugin.v1.ApplicationServiceCreateRequest.inputs:type_name -> google.protobuf.Struct
-	49, // 72: steward.plugin.v1.ApplicationServiceCreateRequest.secrets:type_name -> steward.plugin.v1.ApplicationServiceCreateRequest.SecretsEntry
-	3,  // 73: steward.plugin.v1.ApplicationServiceCreateRequest.source:type_name -> steward.plugin.v1.ApplicationSource
-	4,  // 74: steward.plugin.v1.ApplicationServiceCreateRequest.variables:type_name -> steward.plugin.v1.Variable
-	2,  // 75: steward.plugin.v1.ApplicationServiceCreateResponse.application:type_name -> steward.plugin.v1.Application
-	0,  // 76: steward.plugin.v1.ApplicationServiceDestroyRequest.integration:type_name -> steward.plugin.v1.Integration
-	2,  // 77: steward.plugin.v1.ApplicationServiceDestroyRequest.application:type_name -> steward.plugin.v1.Application
-	0,  // 78: steward.plugin.v1.ApplicationServiceDeployRequest.integration:type_name -> steward.plugin.v1.Integration
-	2,  // 79: steward.plugin.v1.ApplicationServiceDeployRequest.application:type_name -> steward.plugin.v1.Application
-	3,  // 80: steward.plugin.v1.ApplicationServiceDeployRequest.source:type_name -> steward.plugin.v1.ApplicationSource
-	2,  // 81: steward.plugin.v1.ApplicationServiceDeployResponse.application:type_name -> steward.plugin.v1.Application
-	8,  // 82: steward.plugin.v1.PluginService.Describe:input_type -> steward.plugin.v1.DescribeRequest
-	18, // 83: steward.plugin.v1.PluginService.Validate:input_type -> steward.plugin.v1.ValidateRequest
-	21, // 84: steward.plugin.v1.PluginService.GrantAccess:input_type -> steward.plugin.v1.PluginServiceGrantAccessRequest
-	23, // 85: steward.plugin.v1.PluginService.RevokeAccess:input_type -> steward.plugin.v1.PluginServiceRevokeAccessRequest
-	25, // 86: steward.plugin.v1.PluginService.GetAccess:input_type -> steward.plugin.v1.PluginServiceGetAccessRequest
-	27, // 87: steward.plugin.v1.ResourceService.GrantAccess:input_type -> steward.plugin.v1.ResourceServiceGrantAccessRequest
-	29, // 88: steward.plugin.v1.ResourceService.RevokeAccess:input_type -> steward.plugin.v1.ResourceServiceRevokeAccessRequest
-	31, // 89: steward.plugin.v1.ResourceService.GetAccess:input_type -> steward.plugin.v1.ResourceServiceGetAccessRequest
-	33, // 90: steward.plugin.v1.ResourceService.Provision:input_type -> steward.plugin.v1.ResourceServiceProvisionRequest
-	35, // 91: steward.plugin.v1.ResourceService.Deprovision:input_type -> steward.plugin.v1.ResourceServiceDeprovisionRequest
-	37, // 92: steward.plugin.v1.ResourceService.List:input_type -> steward.plugin.v1.ResourceServiceListRequest
-	39, // 93: steward.plugin.v1.ApplicationService.Create:input_type -> steward.plugin.v1.ApplicationServiceCreateRequest
-	41, // 94: steward.plugin.v1.ApplicationService.Destroy:input_type -> steward.plugin.v1.ApplicationServiceDestroyRequest
-	43, // 95: steward.plugin.v1.ApplicationService.Deploy:input_type -> steward.plugin.v1.ApplicationServiceDeployRequest
-	9,  // 96: steward.plugin.v1.PluginService.Describe:output_type -> steward.plugin.v1.DescribeResponse
-	19, // 97: steward.plugin.v1.PluginService.Validate:output_type -> steward.plugin.v1.ValidateResponse
-	22, // 98: steward.plugin.v1.PluginService.GrantAccess:output_type -> steward.plugin.v1.PluginServiceGrantAccessResponse
-	24, // 99: steward.plugin.v1.PluginService.RevokeAccess:output_type -> steward.plugin.v1.PluginServiceRevokeAccessResponse
-	26, // 100: steward.plugin.v1.PluginService.GetAccess:output_type -> steward.plugin.v1.PluginServiceGetAccessResponse
-	28, // 101: steward.plugin.v1.ResourceService.GrantAccess:output_type -> steward.plugin.v1.ResourceServiceGrantAccessResponse
-	30, // 102: steward.plugin.v1.ResourceService.RevokeAccess:output_type -> steward.plugin.v1.ResourceServiceRevokeAccessResponse
-	32, // 103: steward.plugin.v1.ResourceService.GetAccess:output_type -> steward.plugin.v1.ResourceServiceGetAccessResponse
-	34, // 104: steward.plugin.v1.ResourceService.Provision:output_type -> steward.plugin.v1.ResourceServiceProvisionResponse
-	36, // 105: steward.plugin.v1.ResourceService.Deprovision:output_type -> steward.plugin.v1.ResourceServiceDeprovisionResponse
-	38, // 106: steward.plugin.v1.ResourceService.List:output_type -> steward.plugin.v1.ResourceServiceListResponse
-	40, // 107: steward.plugin.v1.ApplicationService.Create:output_type -> steward.plugin.v1.ApplicationServiceCreateResponse
-	42, // 108: steward.plugin.v1.ApplicationService.Destroy:output_type -> steward.plugin.v1.ApplicationServiceDestroyResponse
-	44, // 109: steward.plugin.v1.ApplicationService.Deploy:output_type -> steward.plugin.v1.ApplicationServiceDeployResponse
-	96, // [96:110] is the sub-list for method output_type
-	82, // [82:96] is the sub-list for method input_type
-	82, // [82:82] is the sub-list for extension type_name
-	82, // [82:82] is the sub-list for extension extendee
-	0,  // [0:82] is the sub-list for field type_name
+	20, // 30: steward.plugin.v1.ValidateResponse.input_errors:type_name -> steward.plugin.v1.ValidationError
+	20, // 31: steward.plugin.v1.ValidateResponse.secret_errors:type_name -> steward.plugin.v1.ValidationError
+	0,  // 32: steward.plugin.v1.PluginServiceGrantAccessRequest.integration:type_name -> steward.plugin.v1.Integration
+	5,  // 33: steward.plugin.v1.PluginServiceGrantAccessRequest.identity:type_name -> steward.plugin.v1.Identity
+	6,  // 34: steward.plugin.v1.PluginServiceGrantAccessRequest.role:type_name -> steward.plugin.v1.Role
+	7,  // 35: steward.plugin.v1.PluginServiceGrantAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
+	6,  // 36: steward.plugin.v1.PluginServiceGrantAccessResponse.role:type_name -> steward.plugin.v1.Role
+	7,  // 37: steward.plugin.v1.PluginServiceGrantAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
+	0,  // 38: steward.plugin.v1.PluginServiceRevokeAccessRequest.integration:type_name -> steward.plugin.v1.Integration
+	5,  // 39: steward.plugin.v1.PluginServiceRevokeAccessRequest.identity:type_name -> steward.plugin.v1.Identity
+	6,  // 40: steward.plugin.v1.PluginServiceRevokeAccessRequest.role:type_name -> steward.plugin.v1.Role
+	7,  // 41: steward.plugin.v1.PluginServiceRevokeAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
+	0,  // 42: steward.plugin.v1.PluginServiceGetAccessRequest.integration:type_name -> steward.plugin.v1.Integration
+	5,  // 43: steward.plugin.v1.PluginServiceGetAccessRequest.identity:type_name -> steward.plugin.v1.Identity
+	6,  // 44: steward.plugin.v1.PluginServiceGetAccessResponse.roles:type_name -> steward.plugin.v1.Role
+	7,  // 45: steward.plugin.v1.PluginServiceGetAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
+	5,  // 46: steward.plugin.v1.PluginServiceGetAccessResponse.identity:type_name -> steward.plugin.v1.Identity
+	0,  // 47: steward.plugin.v1.ResourceServiceGrantAccessRequest.integration:type_name -> steward.plugin.v1.Integration
+	1,  // 48: steward.plugin.v1.ResourceServiceGrantAccessRequest.resource:type_name -> steward.plugin.v1.Resource
+	5,  // 49: steward.plugin.v1.ResourceServiceGrantAccessRequest.identity:type_name -> steward.plugin.v1.Identity
+	6,  // 50: steward.plugin.v1.ResourceServiceGrantAccessRequest.role:type_name -> steward.plugin.v1.Role
+	7,  // 51: steward.plugin.v1.ResourceServiceGrantAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
+	6,  // 52: steward.plugin.v1.ResourceServiceGrantAccessResponse.role:type_name -> steward.plugin.v1.Role
+	7,  // 53: steward.plugin.v1.ResourceServiceGrantAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
+	0,  // 54: steward.plugin.v1.ResourceServiceRevokeAccessRequest.integration:type_name -> steward.plugin.v1.Integration
+	1,  // 55: steward.plugin.v1.ResourceServiceRevokeAccessRequest.resource:type_name -> steward.plugin.v1.Resource
+	5,  // 56: steward.plugin.v1.ResourceServiceRevokeAccessRequest.identity:type_name -> steward.plugin.v1.Identity
+	6,  // 57: steward.plugin.v1.ResourceServiceRevokeAccessRequest.role:type_name -> steward.plugin.v1.Role
+	7,  // 58: steward.plugin.v1.ResourceServiceRevokeAccessRequest.permissions:type_name -> steward.plugin.v1.Permission
+	0,  // 59: steward.plugin.v1.ResourceServiceGetAccessRequest.integration:type_name -> steward.plugin.v1.Integration
+	1,  // 60: steward.plugin.v1.ResourceServiceGetAccessRequest.resource:type_name -> steward.plugin.v1.Resource
+	5,  // 61: steward.plugin.v1.ResourceServiceGetAccessRequest.identity:type_name -> steward.plugin.v1.Identity
+	6,  // 62: steward.plugin.v1.ResourceServiceGetAccessResponse.roles:type_name -> steward.plugin.v1.Role
+	7,  // 63: steward.plugin.v1.ResourceServiceGetAccessResponse.permissions:type_name -> steward.plugin.v1.Permission
+	0,  // 64: steward.plugin.v1.ResourceServiceProvisionRequest.integration:type_name -> steward.plugin.v1.Integration
+	50, // 65: steward.plugin.v1.ResourceServiceProvisionRequest.inputs:type_name -> google.protobuf.Struct
+	48, // 66: steward.plugin.v1.ResourceServiceProvisionRequest.secrets:type_name -> steward.plugin.v1.ResourceServiceProvisionRequest.SecretsEntry
+	50, // 67: steward.plugin.v1.ResourceServiceProvisionResponse.outputs:type_name -> google.protobuf.Struct
+	0,  // 68: steward.plugin.v1.ResourceServiceDeprovisionRequest.integration:type_name -> steward.plugin.v1.Integration
+	1,  // 69: steward.plugin.v1.ResourceServiceDeprovisionRequest.resource:type_name -> steward.plugin.v1.Resource
+	0,  // 70: steward.plugin.v1.ResourceServiceListRequest.integration:type_name -> steward.plugin.v1.Integration
+	1,  // 71: steward.plugin.v1.ResourceServiceListResponse.resources:type_name -> steward.plugin.v1.Resource
+	0,  // 72: steward.plugin.v1.ApplicationServiceCreateRequest.integration:type_name -> steward.plugin.v1.Integration
+	50, // 73: steward.plugin.v1.ApplicationServiceCreateRequest.inputs:type_name -> google.protobuf.Struct
+	49, // 74: steward.plugin.v1.ApplicationServiceCreateRequest.secrets:type_name -> steward.plugin.v1.ApplicationServiceCreateRequest.SecretsEntry
+	3,  // 75: steward.plugin.v1.ApplicationServiceCreateRequest.source:type_name -> steward.plugin.v1.ApplicationSource
+	4,  // 76: steward.plugin.v1.ApplicationServiceCreateRequest.variables:type_name -> steward.plugin.v1.Variable
+	2,  // 77: steward.plugin.v1.ApplicationServiceCreateResponse.application:type_name -> steward.plugin.v1.Application
+	0,  // 78: steward.plugin.v1.ApplicationServiceDestroyRequest.integration:type_name -> steward.plugin.v1.Integration
+	2,  // 79: steward.plugin.v1.ApplicationServiceDestroyRequest.application:type_name -> steward.plugin.v1.Application
+	0,  // 80: steward.plugin.v1.ApplicationServiceDeployRequest.integration:type_name -> steward.plugin.v1.Integration
+	2,  // 81: steward.plugin.v1.ApplicationServiceDeployRequest.application:type_name -> steward.plugin.v1.Application
+	3,  // 82: steward.plugin.v1.ApplicationServiceDeployRequest.source:type_name -> steward.plugin.v1.ApplicationSource
+	2,  // 83: steward.plugin.v1.ApplicationServiceDeployResponse.application:type_name -> steward.plugin.v1.Application
+	8,  // 84: steward.plugin.v1.PluginService.Describe:input_type -> steward.plugin.v1.DescribeRequest
+	18, // 85: steward.plugin.v1.PluginService.Validate:input_type -> steward.plugin.v1.ValidateRequest
+	21, // 86: steward.plugin.v1.PluginService.GrantAccess:input_type -> steward.plugin.v1.PluginServiceGrantAccessRequest
+	23, // 87: steward.plugin.v1.PluginService.RevokeAccess:input_type -> steward.plugin.v1.PluginServiceRevokeAccessRequest
+	25, // 88: steward.plugin.v1.PluginService.GetAccess:input_type -> steward.plugin.v1.PluginServiceGetAccessRequest
+	27, // 89: steward.plugin.v1.ResourceService.GrantAccess:input_type -> steward.plugin.v1.ResourceServiceGrantAccessRequest
+	29, // 90: steward.plugin.v1.ResourceService.RevokeAccess:input_type -> steward.plugin.v1.ResourceServiceRevokeAccessRequest
+	31, // 91: steward.plugin.v1.ResourceService.GetAccess:input_type -> steward.plugin.v1.ResourceServiceGetAccessRequest
+	33, // 92: steward.plugin.v1.ResourceService.Provision:input_type -> steward.plugin.v1.ResourceServiceProvisionRequest
+	35, // 93: steward.plugin.v1.ResourceService.Deprovision:input_type -> steward.plugin.v1.ResourceServiceDeprovisionRequest
+	37, // 94: steward.plugin.v1.ResourceService.List:input_type -> steward.plugin.v1.ResourceServiceListRequest
+	39, // 95: steward.plugin.v1.ApplicationService.Create:input_type -> steward.plugin.v1.ApplicationServiceCreateRequest
+	41, // 96: steward.plugin.v1.ApplicationService.Destroy:input_type -> steward.plugin.v1.ApplicationServiceDestroyRequest
+	43, // 97: steward.plugin.v1.ApplicationService.Deploy:input_type -> steward.plugin.v1.ApplicationServiceDeployRequest
+	9,  // 98: steward.plugin.v1.PluginService.Describe:output_type -> steward.plugin.v1.DescribeResponse
+	19, // 99: steward.plugin.v1.PluginService.Validate:output_type -> steward.plugin.v1.ValidateResponse
+	22, // 100: steward.plugin.v1.PluginService.GrantAccess:output_type -> steward.plugin.v1.PluginServiceGrantAccessResponse
+	24, // 101: steward.plugin.v1.PluginService.RevokeAccess:output_type -> steward.plugin.v1.PluginServiceRevokeAccessResponse
+	26, // 102: steward.plugin.v1.PluginService.GetAccess:output_type -> steward.plugin.v1.PluginServiceGetAccessResponse
+	28, // 103: steward.plugin.v1.ResourceService.GrantAccess:output_type -> steward.plugin.v1.ResourceServiceGrantAccessResponse
+	30, // 104: steward.plugin.v1.ResourceService.RevokeAccess:output_type -> steward.plugin.v1.ResourceServiceRevokeAccessResponse
+	32, // 105: steward.plugin.v1.ResourceService.GetAccess:output_type -> steward.plugin.v1.ResourceServiceGetAccessResponse
+	34, // 106: steward.plugin.v1.ResourceService.Provision:output_type -> steward.plugin.v1.ResourceServiceProvisionResponse
+	36, // 107: steward.plugin.v1.ResourceService.Deprovision:output_type -> steward.plugin.v1.ResourceServiceDeprovisionResponse
+	38, // 108: steward.plugin.v1.ResourceService.List:output_type -> steward.plugin.v1.ResourceServiceListResponse
+	40, // 109: steward.plugin.v1.ApplicationService.Create:output_type -> steward.plugin.v1.ApplicationServiceCreateResponse
+	42, // 110: steward.plugin.v1.ApplicationService.Destroy:output_type -> steward.plugin.v1.ApplicationServiceDestroyResponse
+	44, // 111: steward.plugin.v1.ApplicationService.Deploy:output_type -> steward.plugin.v1.ApplicationServiceDeployResponse
+	98, // [98:112] is the sub-list for method output_type
+	84, // [84:98] is the sub-list for method input_type
+	84, // [84:84] is the sub-list for extension type_name
+	84, // [84:84] is the sub-list for extension extendee
+	0,  // [0:84] is the sub-list for field type_name
 }
 
 func init() { file_steward_plugin_v1_plugin_proto_init() }

@@ -1,0 +1,9 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: treno-dev/steward-gh-actions/.github/workflows/release-plugin.yml@v1

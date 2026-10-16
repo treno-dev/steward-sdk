@@ -42,16 +42,17 @@ const plugin = createPlugin({
   // The credentials it is configured with.
   secrets: [{ name: 'API_TOKEN', description: 'The token to call the API with.', required: true }],
 
-  // Check that the inputs and credentials work. Return an error per input the user can fix.
+  // Check that the inputs and credentials work. Return an error for each input or secret the user can fix, in the list of what it is
+  // about: `inputErrors`, `secretErrors`, or `errors` for what is about the integration as a whole.
   async validate(request: PluginValidateRequest): Promise<PluginValidateResponse> {
     const { integration } = request;
-    const errors: { field: string; message: string }[] = [];
+    const secretErrors: { field: string; message: string }[] = [];
 
     if (!integration.secrets.API_TOKEN) {
-      errors.push({ field: 'API_TOKEN', message: 'An API token is required.' });
+      secretErrors.push({ field: 'API_TOKEN', message: 'An API token is required.' });
     }
 
-    return { errors };
+    return { errors: [], inputErrors: [], secretErrors };
   },
 });
 

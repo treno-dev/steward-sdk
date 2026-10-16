@@ -56,7 +56,7 @@ p.Serve()
 | `Title`, `Description` | Shown in Steward. |
 | `Inputs` | The settings the plugin is configured with. |
 | `Secrets` | The credentials it is configured with, such as an API token. |
-| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix. Without it, every integration is accepted. |
+| `Validate` | Optional. Checks the credentials, which Steward cannot. Returns `ValidationError`s the user can fix, in the list of what they are about: `InputErrors`, `SecretErrors`, or `Errors` for the integration as a whole. Without it, every integration is accepted. |
 | `Roles`, `Permissions`, `GrantAccess`, `RevokeAccess`, `GetAccess` | Access to the plugin as a whole, such as membership of an organization. |
 
 **A resource**, with `p.Resource("kind", plugin.ResourceOptions{...})`, and **an application**,

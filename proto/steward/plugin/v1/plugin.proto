@@ -314,13 +314,19 @@ message ValidateRequest {
 }
 
 message ValidateResponse {
-  // Problems with the inputs or credentials that the user can fix. Empty when the integration is good.
-  // Failures of the call itself are returned as gRPC errors instead.
+  // Problems with the integration as a whole, which the user can fix but which are not about one input or secret. Empty when
+  // the integration is good. Failures of the call itself are returned as gRPC errors instead.
   repeated ValidationError errors = 1;
+  // Problems with one input, each naming the input in `field`. Inputs and secrets are separate lists, so which list an error is in
+  // says which of them it is about.
+  repeated ValidationError input_errors = 2;
+  // Problems with one secret, each naming the secret in `field`, such as a token that the tool does not accept.
+  repeated ValidationError secret_errors = 3;
 }
 
 message ValidationError {
-  // The input the error is about. Empty when it is about the integration as a whole.
+  // The name of the input or the secret the error is about, as the list it is in says. Empty in `errors`, which is about the
+  // integration as a whole.
   string field = 1;
   string message = 2;
 }

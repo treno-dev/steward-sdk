@@ -18,12 +18,14 @@ import (
 	"github.com/treno-dev/steward-sdk/go/plugin"
 )
 
-// Check that the inputs and credentials work. Return an error per input the user can fix.
+// Check that the inputs and credentials work. Return an error for each input or secret the user can fix.
 func validate(ctx context.Context, request *plugin.PluginValidateRequest) (*plugin.PluginValidateResponse, error) {
 	response := &plugin.PluginValidateResponse{}
 
+	// An error goes in the list of what it is about: InputErrors for an input, SecretErrors for a secret, and Errors for what is
+	// about the integration as a whole. Steward marks the field that the list says, and does not guess it from a name.
 	if request.GetIntegration().GetSecrets()["API_TOKEN"] == "" {
-		response.Errors = append(response.Errors, &plugin.ValidationError{
+		response.SecretErrors = append(response.SecretErrors, &plugin.ValidationError{
 			Field:   "API_TOKEN",
 			Message: "An API token is required.",
 		})

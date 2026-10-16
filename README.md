@@ -193,15 +193,16 @@ const plugin = createPlugin({
     { name: "API_TOKEN", description: "The token to call the API with.", required: true },
   ],
 
-  // Return an error for each input or secret the user can fix.
+  // Return an error for each input or secret the user can fix, in the list of what it is about: `inputErrors`, `secretErrors`, or
+  // `errors` for what is about the integration as a whole.
   async validate({ integration }) {
-    const errors = [];
+    const secretErrors = [];
 
     if (!integration.secrets.API_TOKEN) {
-      errors.push({ field: "API_TOKEN", message: "An API token is required." });
+      secretErrors.push({ field: "API_TOKEN", message: "An API token is required." });
     }
 
-    return { errors };
+    return { errors: [], inputErrors: [], secretErrors };
   },
 
   // Access to the tool as a whole, such as membership of an organization.

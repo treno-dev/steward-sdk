@@ -82,7 +82,7 @@ for example both Cloudflare and AWS, take the credentials for each as secrets.
 | `title`, `description`                                                | Shown in Steward.                                                                                                                                    |
 | `inputs`                                                              | The settings the plugin is configured with.                                                                                                          |
 | `secrets`                                                             | The credentials it is configured with, such as an API token.                                                                                         |
-| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [{"field": ..., "message": ...}]}`. Without it, every integration is accepted. |
+| `validate`                                                            | Optional. Checks the credentials, which Steward cannot. Returns `{"errors": [...], "input_errors": [...], "secret_errors": [...]}`, each a list of `{"field": ..., "message": ...}`: `input_errors` and `secret_errors` name an input or a secret, and `errors` is about the integration as a whole. Without it, every integration is accepted. |
 | `roles`, `permissions`, `grant_access`, `revoke_access`, `get_access` | Access to the plugin as a whole, such as membership of an organization.                                                                              |
 
 **A resource**, with `plugin.resource(kind=..., ...)`, and **an application**, with
