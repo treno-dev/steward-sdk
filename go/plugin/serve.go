@@ -89,8 +89,8 @@ type pluginService struct {
 	plugin *Plugin
 }
 
-func (s pluginService) Describe(context.Context, *pluginv1.DescribeRequest) (*pluginv1.DescribeResponse, error) {
-	return s.plugin.describe(), nil
+func (s pluginService) Describe(ctx context.Context, request *pluginv1.DescribeRequest) (*pluginv1.DescribeResponse, error) {
+	return s.plugin.describe(ctx, request.GetIntegration()), nil
 }
 
 func (s pluginService) Validate(ctx context.Context, request *PluginValidateRequest) (*PluginValidateResponse, error) {

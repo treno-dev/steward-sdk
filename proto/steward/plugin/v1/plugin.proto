@@ -30,6 +30,25 @@ message Integration {
   // Values for the secrets declared in PluginDefinition.secrets, keyed by secret name. Resolved by
   // the runner for this call only.
   map<string, string> secrets = 2;
+
+  // Who the integration is. A plugin can name what it makes in a tool after it, such as a role.
+  string ulid = 3;
+  string name = 4;
+
+  // The organization the integration belongs to.
+  Organization organization = 5;
+
+  // A token that proves who the integration is, signed by Steward, for the cloud named by
+  // PluginDefinition.identity_audience. The plugin exchanges it for credentials of the cloud. It is
+  // set only when the plugin declares an audience, it is valid for minutes, and a plugin must not
+  // persist it.
+  string identity_token = 6;
+}
+
+// An organization of Steward, as a plugin is told of it.
+message Organization {
+  string ulid = 1;
+  string name = 2;
 }
 
 // Something in the tool that access can be granted to or that can be provisioned.
@@ -164,7 +183,12 @@ message Permission {
 // PluginService messages
 // ---------------------------------------------------------------------------------------------
 
-message DescribeRequest {}
+message DescribeRequest {
+  // The integration the plugin is being added for, when there is one. Steward sets it when a runner
+  // installs an integration, so that the plugin can say what the person does in the tool before the
+  // settings. Tools that only read the description, such as the generator of docs, leave it empty.
+  Integration integration = 1;
+}
 
 message DescribeResponse {
   string name = 1;
@@ -173,6 +197,21 @@ message DescribeResponse {
   // What the plugin offers. A plugin that needs several tools takes the credentials for each as
   // secrets.
   PluginDefinition definition = 3;
+
+  // Steps the person takes in another tool before the settings of this integration, such as a page
+  // that creates a stack. They are for the integration of the request and are kept with it: the
+  // definition is the same for every integration of a version of the plugin, and these are not.
+  // Empty when the request has no integration.
+  repeated SetupLink setup_links = 4;
+}
+
+// A step to take in another tool, as a link that opens it ready to use.
+message SetupLink {
+  string title = 1;
+  string description = 2;
+
+  // An https address.
+  string url = 3;
 }
 
 message PluginDefinition {
@@ -206,6 +245,11 @@ message PluginDefinition {
   // integration, and the plugin reaches the place with the credentials of that integration. Empty
   // when the plugin keeps no secrets.
   repeated SecretEngineDefinition secret_engines = 9;
+
+  // The audience of the token that proves who an integration is, such as `sts.amazonaws.com`. A
+  // plugin that reaches its tool with a token of Steward declares it, and the runner sends the token
+  // in Integration.identity_token. Empty when the plugin takes no token.
+  string identity_audience = 10;
 }
 
 // One setting a plugin, a resource or an application takes, declared the way a variable is: a name

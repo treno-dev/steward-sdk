@@ -34,12 +34,23 @@ type Options struct {
 	Title       string
 	Description string
 
+	// IdentityAudience is the audience of the token that proves who an integration is, such as
+	// "sts.amazonaws.com". A plugin that declares it is sent the token, signed by Steward, in the
+	// identity token of the integration of each call.
+	IdentityAudience string
+
 	// Inputs are the settings the plugin is configured with; Secrets are its credentials.
 	Inputs  []*InputDefinition
 	Secrets []*SecretDefinition
 
 	// Validate checks the inputs and credentials.
 	Validate func(context.Context, *PluginValidateRequest) (*PluginValidateResponse, error)
+
+	// SetupLinks says what the person does in another tool before the settings of an integration,
+	// such as a page that creates a role, as links with the address already filled in. It is given
+	// the integration when a runner installs it, and nothing when the description is read for the
+	// docs, so it has to answer for an integration that is nil.
+	SetupLinks func(context.Context, *Integration) []*SetupLink
 
 	// What can be granted on the plugin as a whole, and the handlers that grant it.
 	Permissions []*PermissionDefinition
@@ -171,7 +182,7 @@ func (p *Plugin) Application(kind string, options ApplicationOptions) *Plugin {
 	return p
 }
 
-func (p *Plugin) describe() *pluginv1.DescribeResponse {
+func (p *Plugin) describe(ctx context.Context, integration *Integration) *pluginv1.DescribeResponse {
 	o := p.options
 	definition := &pluginv1.PluginDefinition{
 		Title:       o.Title,
@@ -180,6 +191,8 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 		Secrets:     o.Secrets,
 		Permissions: o.Permissions,
 		Roles:       o.Roles,
+
+		IdentityAudience: o.IdentityAudience,
 	}
 
 	for _, name := range p.resourceOrder {
@@ -210,7 +223,14 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 		})
 	}
 
-	return &pluginv1.DescribeResponse{Name: o.Name, Version: o.Version, Definition: definition}
+	response := &pluginv1.DescribeResponse{Name: o.Name, Version: o.Version, Definition: definition}
+
+	// The links are for an integration, so a description that was asked for without one has none.
+	if integration != nil && o.SetupLinks != nil {
+		response.SetupLinks = o.SetupLinks(ctx, integration)
+	}
+
+	return response
 }
 
 func resourceDefinition(kind string, options ResourceOptions) *pluginv1.ResourceDefinition {

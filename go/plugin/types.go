@@ -36,6 +36,8 @@ func Value(value any) *structpb.Value {
 // Requests and responses are named for what they handle (the entity, then the call).
 type (
 	Integration       = pluginv1.Integration
+	Organization      = pluginv1.Organization
+	SetupLink         = pluginv1.SetupLink
 	Resource          = pluginv1.Resource
 	Application       = pluginv1.Application
 	ApplicationSource = pluginv1.ApplicationSource
