@@ -43,6 +43,11 @@ message Integration {
   // set only when the plugin declares an audience, it is valid for minutes, and a plugin must not
   // persist it.
   string identity_token = 6;
+
+  // The address of Steward as an issuer of identity tokens: the `iss` of the token, which a cloud is
+  // told to trust. A plugin that sets up trust in it, such as with a link to a guide, uses this
+  // address. It is set in Describe, for the integration the plugin is described for.
+  string identity_issuer = 7;
 }
 
 // An organization of Steward, as a plugin is told of it.

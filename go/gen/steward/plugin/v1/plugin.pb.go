@@ -42,8 +42,12 @@ type Integration struct {
 	// set only when the plugin declares an audience, it is valid for minutes, and a plugin must not
 	// persist it.
 	IdentityToken string `protobuf:"bytes,6,opt,name=identity_token,json=identityToken,proto3" json:"identity_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// The address of Steward as an issuer of identity tokens: the `iss` of the token, which a cloud is
+	// told to trust. A plugin that sets up trust in it, such as with a link to a guide, uses this
+	// address. It is set in Describe, for the integration the plugin is described for.
+	IdentityIssuer string `protobuf:"bytes,7,opt,name=identity_issuer,json=identityIssuer,proto3" json:"identity_issuer,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Integration) Reset() {
@@ -114,6 +118,13 @@ func (x *Integration) GetOrganization() *Organization {
 func (x *Integration) GetIdentityToken() string {
 	if x != nil {
 		return x.IdentityToken
+	}
+	return ""
+}
+
+func (x *Integration) GetIdentityIssuer() string {
+	if x != nil {
+		return x.IdentityIssuer
 	}
 	return ""
 }
@@ -3668,14 +3679,15 @@ var File_steward_plugin_v1_plugin_proto protoreflect.FileDescriptor
 
 const file_steward_plugin_v1_plugin_proto_rawDesc = "" +
 	"\n" +
-	"\x1esteward/plugin/v1/plugin.proto\x12\x11steward.plugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xd5\x02\n" +
+	"\x1esteward/plugin/v1/plugin.proto\x12\x11steward.plugin.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xfe\x02\n" +
 	"\vIntegration\x12/\n" +
 	"\x06inputs\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x06inputs\x12E\n" +
 	"\asecrets\x18\x02 \x03(\v2+.steward.plugin.v1.Integration.SecretsEntryR\asecrets\x12\x12\n" +
 	"\x04ulid\x18\x03 \x01(\tR\x04ulid\x12\x12\n" +
 	"\x04name\x18\x04 \x01(\tR\x04name\x12C\n" +
 	"\forganization\x18\x05 \x01(\v2\x1f.steward.plugin.v1.OrganizationR\forganization\x12%\n" +
-	"\x0eidentity_token\x18\x06 \x01(\tR\ridentityToken\x1a:\n" +
+	"\x0eidentity_token\x18\x06 \x01(\tR\ridentityToken\x12'\n" +
+	"\x0fidentity_issuer\x18\a \x01(\tR\x0eidentityIssuer\x1a:\n" +
 	"\fSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"6\n" +
