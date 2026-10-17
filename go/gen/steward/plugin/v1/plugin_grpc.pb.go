@@ -769,3 +769,187 @@ var ApplicationService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "steward/plugin/v1/plugin.proto",
 }
+
+const (
+	SecretEngineService_Put_FullMethodName    = "/steward.plugin.v1.SecretEngineService/Put"
+	SecretEngineService_Delete_FullMethodName = "/steward.plugin.v1.SecretEngineService/Delete"
+	SecretEngineService_Get_FullMethodName    = "/steward.plugin.v1.SecretEngineService/Get"
+)
+
+// SecretEngineServiceClient is the client API for SecretEngineService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// For plugins that keep secrets (PluginDefinition.secret_engines). A call an engine does not offer
+// answers UNIMPLEMENTED.
+type SecretEngineServiceClient interface {
+	Put(ctx context.Context, in *SecretEngineServicePutRequest, opts ...grpc.CallOption) (*SecretEngineServicePutResponse, error)
+	Delete(ctx context.Context, in *SecretEngineServiceDeleteRequest, opts ...grpc.CallOption) (*SecretEngineServiceDeleteResponse, error)
+	Get(ctx context.Context, in *SecretEngineServiceGetRequest, opts ...grpc.CallOption) (*SecretEngineServiceGetResponse, error)
+}
+
+type secretEngineServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSecretEngineServiceClient(cc grpc.ClientConnInterface) SecretEngineServiceClient {
+	return &secretEngineServiceClient{cc}
+}
+
+func (c *secretEngineServiceClient) Put(ctx context.Context, in *SecretEngineServicePutRequest, opts ...grpc.CallOption) (*SecretEngineServicePutResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SecretEngineServicePutResponse)
+	err := c.cc.Invoke(ctx, SecretEngineService_Put_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *secretEngineServiceClient) Delete(ctx context.Context, in *SecretEngineServiceDeleteRequest, opts ...grpc.CallOption) (*SecretEngineServiceDeleteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SecretEngineServiceDeleteResponse)
+	err := c.cc.Invoke(ctx, SecretEngineService_Delete_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *secretEngineServiceClient) Get(ctx context.Context, in *SecretEngineServiceGetRequest, opts ...grpc.CallOption) (*SecretEngineServiceGetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SecretEngineServiceGetResponse)
+	err := c.cc.Invoke(ctx, SecretEngineService_Get_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SecretEngineServiceServer is the server API for SecretEngineService service.
+// All implementations must embed UnimplementedSecretEngineServiceServer
+// for forward compatibility.
+//
+// For plugins that keep secrets (PluginDefinition.secret_engines). A call an engine does not offer
+// answers UNIMPLEMENTED.
+type SecretEngineServiceServer interface {
+	Put(context.Context, *SecretEngineServicePutRequest) (*SecretEngineServicePutResponse, error)
+	Delete(context.Context, *SecretEngineServiceDeleteRequest) (*SecretEngineServiceDeleteResponse, error)
+	Get(context.Context, *SecretEngineServiceGetRequest) (*SecretEngineServiceGetResponse, error)
+	mustEmbedUnimplementedSecretEngineServiceServer()
+}
+
+// UnimplementedSecretEngineServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSecretEngineServiceServer struct{}
+
+func (UnimplementedSecretEngineServiceServer) Put(context.Context, *SecretEngineServicePutRequest) (*SecretEngineServicePutResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Put not implemented")
+}
+func (UnimplementedSecretEngineServiceServer) Delete(context.Context, *SecretEngineServiceDeleteRequest) (*SecretEngineServiceDeleteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedSecretEngineServiceServer) Get(context.Context, *SecretEngineServiceGetRequest) (*SecretEngineServiceGetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Get not implemented")
+}
+func (UnimplementedSecretEngineServiceServer) mustEmbedUnimplementedSecretEngineServiceServer() {}
+func (UnimplementedSecretEngineServiceServer) testEmbeddedByValue()                             {}
+
+// UnsafeSecretEngineServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SecretEngineServiceServer will
+// result in compilation errors.
+type UnsafeSecretEngineServiceServer interface {
+	mustEmbedUnimplementedSecretEngineServiceServer()
+}
+
+func RegisterSecretEngineServiceServer(s grpc.ServiceRegistrar, srv SecretEngineServiceServer) {
+	// If the following call panics, it indicates UnimplementedSecretEngineServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SecretEngineService_ServiceDesc, srv)
+}
+
+func _SecretEngineService_Put_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SecretEngineServicePutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SecretEngineServiceServer).Put(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SecretEngineService_Put_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SecretEngineServiceServer).Put(ctx, req.(*SecretEngineServicePutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SecretEngineService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SecretEngineServiceDeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SecretEngineServiceServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SecretEngineService_Delete_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SecretEngineServiceServer).Delete(ctx, req.(*SecretEngineServiceDeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SecretEngineService_Get_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SecretEngineServiceGetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SecretEngineServiceServer).Get(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SecretEngineService_Get_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SecretEngineServiceServer).Get(ctx, req.(*SecretEngineServiceGetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SecretEngineService_ServiceDesc is the grpc.ServiceDesc for SecretEngineService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SecretEngineService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "steward.plugin.v1.SecretEngineService",
+	HandlerType: (*SecretEngineServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Put",
+			Handler:    _SecretEngineService_Put_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _SecretEngineService_Delete_Handler,
+		},
+		{
+			MethodName: "Get",
+			Handler:    _SecretEngineService_Get_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "steward/plugin/v1/plugin.proto",
+}

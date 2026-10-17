@@ -92,24 +92,59 @@ type ApplicationOptions struct {
 	Deploy  func(context.Context, *ApplicationDeployRequest) (*ApplicationDeployResponse, error)
 }
 
-// Plugin is what a plugin author builds. Declare its resources and applications, then call Serve.
+// SecretEngineOptions describe a place the plugin can keep secrets, with its handlers. A call for
+// something without a handler fails with UNIMPLEMENTED. A value is never shown to a person: Get is
+// how the runner resolves a secret for a call.
+type SecretEngineOptions struct {
+	Title       string
+	Description string
+
+	// Icon is the name of an icon for the engine, such as "database" or "vault".
+	Icon string
+
+	// Inputs are the settings of a store made with this engine, such as a prefix. The credentials
+	// are the integration's.
+	Inputs []*InputDefinition
+
+	Put    func(context.Context, *SecretEnginePutRequest) (*SecretEnginePutResponse, error)
+	Delete func(context.Context, *SecretEngineDeleteRequest) (*SecretEngineDeleteResponse, error)
+	Get    func(context.Context, *SecretEngineGetRequest) (*SecretEngineGetResponse, error)
+}
+
+// Plugin is what a plugin author builds. Declare its resources, applications and secret engines,
+// then call Serve.
 type Plugin struct {
-	options      Options
-	resources    map[string]ResourceOptions
-	applications map[string]ApplicationOptions
+	options       Options
+	resources     map[string]ResourceOptions
+	applications  map[string]ApplicationOptions
+	secretEngines map[string]SecretEngineOptions
 
 	// Declaration order, so the description lists kinds the way the plugin declared them.
-	resourceOrder    []string
-	applicationOrder []string
+	resourceOrder     []string
+	applicationOrder  []string
+	secretEngineOrder []string
 }
 
 // New creates a plugin.
 func New(options Options) *Plugin {
 	return &Plugin{
-		options:      options,
-		resources:    map[string]ResourceOptions{},
-		applications: map[string]ApplicationOptions{},
+		options:       options,
+		resources:     map[string]ResourceOptions{},
+		applications:  map[string]ApplicationOptions{},
+		secretEngines: map[string]SecretEngineOptions{},
 	}
+}
+
+// SecretEngine declares a place the plugin can keep secrets. The name is unique within the plugin,
+// such as "parameter-store".
+func (p *Plugin) SecretEngine(name string, options SecretEngineOptions) *Plugin {
+	if _, declared := p.secretEngines[name]; !declared {
+		p.secretEngineOrder = append(p.secretEngineOrder, name)
+	}
+
+	p.secretEngines[name] = options
+
+	return p
 }
 
 // Resource declares a kind of resource the plugin manages. The kind is unique within the
@@ -164,6 +199,17 @@ func (p *Plugin) describe() *pluginv1.DescribeResponse {
 		})
 	}
 
+	for _, name := range p.secretEngineOrder {
+		options := p.secretEngines[name]
+		definition.SecretEngines = append(definition.SecretEngines, &pluginv1.SecretEngineDefinition{
+			Name:        name,
+			Title:       options.Title,
+			Description: options.Description,
+			Icon:        options.Icon,
+			Inputs:      options.Inputs,
+		})
+	}
+
 	return &pluginv1.DescribeResponse{Name: o.Name, Version: o.Version, Definition: definition}
 }
 
@@ -193,6 +239,15 @@ func (p *Plugin) application(kind string) (ApplicationOptions, error) {
 	found, ok := p.applications[kind]
 	if !ok {
 		return found, status.Error(codes.NotFound, fmt.Sprintf("this plugin has no application %q", kind))
+	}
+
+	return found, nil
+}
+
+func (p *Plugin) secretEngine(name string) (SecretEngineOptions, error) {
+	found, ok := p.secretEngines[name]
+	if !ok {
+		return found, status.Error(codes.NotFound, fmt.Sprintf("this plugin has no secret engine %q", name))
 	}
 
 	return found, nil

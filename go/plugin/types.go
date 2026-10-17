@@ -51,6 +51,8 @@ type (
 	RoleDefinition       = pluginv1.RoleDefinition
 	ValidationError      = pluginv1.ValidationError
 
+	SecretEngineDefinition = pluginv1.SecretEngineDefinition
+
 	PluginValidateRequest      = pluginv1.ValidateRequest
 	PluginValidateResponse     = pluginv1.ValidateResponse
 	PluginGrantAccessRequest   = pluginv1.PluginServiceGrantAccessRequest
@@ -79,6 +81,13 @@ type (
 	ApplicationDestroyResponse = pluginv1.ApplicationServiceDestroyResponse
 	ApplicationDeployRequest   = pluginv1.ApplicationServiceDeployRequest
 	ApplicationDeployResponse  = pluginv1.ApplicationServiceDeployResponse
+
+	SecretEnginePutRequest     = pluginv1.SecretEngineServicePutRequest
+	SecretEnginePutResponse    = pluginv1.SecretEngineServicePutResponse
+	SecretEngineDeleteRequest  = pluginv1.SecretEngineServiceDeleteRequest
+	SecretEngineDeleteResponse = pluginv1.SecretEngineServiceDeleteResponse
+	SecretEngineGetRequest     = pluginv1.SecretEngineServiceGetRequest
+	SecretEngineGetResponse    = pluginv1.SecretEngineServiceGetResponse
 )
 
 // The types an InputDefinition or OutputDefinition can have.

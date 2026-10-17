@@ -49,6 +49,10 @@ func (g *grpcPlugin) GRPCServer(_ *goplugin.GRPCBroker, server *grpc.Server) err
 		pluginv1.RegisterApplicationServiceServer(server, applicationService{plugin: p})
 	}
 
+	if len(p.secretEngines) > 0 {
+		pluginv1.RegisterSecretEngineServiceServer(server, secretEngineService{plugin: p})
+	}
+
 	return nil
 }
 
@@ -247,4 +251,48 @@ func (s applicationService) Deploy(ctx context.Context, request *ApplicationDepl
 	}
 
 	return kind.Deploy(ctx, request)
+}
+
+type secretEngineService struct {
+	pluginv1.UnimplementedSecretEngineServiceServer
+	plugin *Plugin
+}
+
+func (s secretEngineService) Put(ctx context.Context, request *SecretEnginePutRequest) (*SecretEnginePutResponse, error) {
+	engine, err := s.plugin.secretEngine(request.GetEngine())
+	if err != nil {
+		return nil, err
+	}
+
+	if engine.Put == nil {
+		return nil, unimplemented("put", "secret engine")
+	}
+
+	return engine.Put(ctx, request)
+}
+
+func (s secretEngineService) Delete(ctx context.Context, request *SecretEngineDeleteRequest) (*SecretEngineDeleteResponse, error) {
+	engine, err := s.plugin.secretEngine(request.GetEngine())
+	if err != nil {
+		return nil, err
+	}
+
+	if engine.Delete == nil {
+		return nil, unimplemented("delete", "secret engine")
+	}
+
+	return engine.Delete(ctx, request)
+}
+
+func (s secretEngineService) Get(ctx context.Context, request *SecretEngineGetRequest) (*SecretEngineGetResponse, error) {
+	engine, err := s.plugin.secretEngine(request.GetEngine())
+	if err != nil {
+		return nil, err
+	}
+
+	if engine.Get == nil {
+		return nil, unimplemented("get", "secret engine")
+	}
+
+	return engine.Get(ctx, request)
 }

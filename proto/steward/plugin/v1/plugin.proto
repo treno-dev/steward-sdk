@@ -200,6 +200,12 @@ message PluginDefinition {
   // people edit over time. Kinds are unique within the plugin. Empty when the plugin runs no
   // applications.
   repeated ApplicationDefinition applications = 7;
+
+  // The places this plugin can keep secrets for an organization, such as a parameter store or a
+  // secrets manager. Names are unique within the plugin. A store is made with an engine of an
+  // integration, and the plugin reaches the place with the credentials of that integration. Empty
+  // when the plugin keeps no secrets.
+  repeated SecretEngineDefinition secret_engines = 9;
 }
 
 // One setting a plugin, a resource or an application takes, declared the way a variable is: a name
@@ -290,6 +296,22 @@ message ApplicationDefinition {
 
   // What it produces, such as its URL.
   repeated OutputDefinition outputs = 6;
+}
+
+// A place a plugin can keep secrets, such as a parameter store. Values are write-only: there is no
+// call that reads one back for a person.
+message SecretEngineDefinition {
+  // Unique within the plugin, such as "parameter-store". A store keeps its settings under it.
+  string name = 1;
+  string title = 2;
+  string description = 3;
+
+  // The name of an icon for the engine, such as "database" or "vault".
+  string icon = 4;
+
+  // The settings of a store made with this engine, such as a prefix. Not the credentials, which are
+  // the integration's.
+  repeated InputDefinition inputs = 5;
 }
 
 message PermissionDefinition {
@@ -549,6 +571,58 @@ message ApplicationServiceDeployResponse {
   Application application = 1;
 }
 
+// Writes a secret, creating it or replacing it. Idempotent. The value is a secret of the call: the
+// plugin must not persist it or write it to a log.
+message SecretEngineServicePutRequest {
+  Integration integration = 1;
+
+  // A name declared in PluginDefinition.secret_engines.
+  string engine = 2;
+
+  // The settings of the store, keyed by the inputs the engine declared.
+  google.protobuf.Struct settings = 3;
+
+  // The name of the secret, which can hold slashes.
+  string name = 4;
+
+  string value = 5;
+
+  // Where the secret is placed, such as the region of an AWS secret, and its tags.
+  google.protobuf.Struct metadata = 6;
+}
+
+message SecretEngineServicePutResponse {}
+
+// Removes a secret. Idempotent: succeeds if it is already gone.
+message SecretEngineServiceDeleteRequest {
+  Integration integration = 1;
+  string engine = 2;
+  google.protobuf.Struct settings = 3;
+  string name = 4;
+
+  // The metadata the secret was placed with.
+  google.protobuf.Struct metadata = 5;
+}
+
+message SecretEngineServiceDeleteResponse {}
+
+// Reads a secret, for the runner to hand to another plugin as a secret of its call. It is how a
+// secret is resolved, and nothing shows the value to a person. The plugin must not persist the
+// value or write it to a log. Fails with NOT_FOUND if there is no such secret.
+message SecretEngineServiceGetRequest {
+  Integration integration = 1;
+  string engine = 2;
+  google.protobuf.Struct settings = 3;
+  string name = 4;
+
+  // The metadata the secret was placed with.
+  google.protobuf.Struct metadata = 5;
+}
+
+message SecretEngineServiceGetResponse {
+  string value = 1;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Services
 // ---------------------------------------------------------------------------------------------
@@ -587,4 +661,12 @@ service ApplicationService {
   rpc Create(ApplicationServiceCreateRequest) returns (ApplicationServiceCreateResponse);
   rpc Destroy(ApplicationServiceDestroyRequest) returns (ApplicationServiceDestroyResponse);
   rpc Deploy(ApplicationServiceDeployRequest) returns (ApplicationServiceDeployResponse);
+}
+
+// For plugins that keep secrets (PluginDefinition.secret_engines). A call an engine does not offer
+// answers UNIMPLEMENTED.
+service SecretEngineService {
+  rpc Put(SecretEngineServicePutRequest) returns (SecretEngineServicePutResponse);
+  rpc Delete(SecretEngineServiceDeleteRequest) returns (SecretEngineServiceDeleteResponse);
+  rpc Get(SecretEngineServiceGetRequest) returns (SecretEngineServiceGetResponse);
 }
