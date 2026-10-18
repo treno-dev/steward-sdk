@@ -117,6 +117,10 @@ type SecretEngineOptions struct {
 	// are the integration's.
 	Inputs []*InputDefinition
 
+	// Placement is where each secret is placed in the backend, such as the region of an AWS secret.
+	// It is chosen when the secret is made, and sent in the metadata of every call about the secret.
+	Placement []*InputDefinition
+
 	Put    func(context.Context, *SecretEnginePutRequest) (*SecretEnginePutResponse, error)
 	Delete func(context.Context, *SecretEngineDeleteRequest) (*SecretEngineDeleteResponse, error)
 	Get    func(context.Context, *SecretEngineGetRequest) (*SecretEngineGetResponse, error)
@@ -220,6 +224,7 @@ func (p *Plugin) describe(ctx context.Context, integration *Integration) *plugin
 			Description: options.Description,
 			Icon:        options.Icon,
 			Inputs:      options.Inputs,
+			Placement:   options.Placement,
 		})
 	}
 

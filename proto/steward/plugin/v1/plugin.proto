@@ -361,6 +361,11 @@ message SecretEngineDefinition {
   // The settings of a store made with this engine, such as a prefix. Not the credentials, which are
   // the integration's.
   repeated InputDefinition inputs = 5;
+
+  // Where each secret is placed in the backend, such as the region of an AWS secret, which differs
+  // from one secret to the next and is chosen when the secret is made. The values are sent in the
+  // metadata of every call about the secret.
+  repeated InputDefinition placement = 6;
 }
 
 message PermissionDefinition {
